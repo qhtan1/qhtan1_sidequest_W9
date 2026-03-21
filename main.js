@@ -1,37 +1,5 @@
 // main.js
 // Sketch entry point (VIEW + orchestration layer).
-//
-// Responsibilities:
-// - Load tuning.json and levels.json via LevelLoader
-// - Preload assets (images, animations, audio, parallax layers)
-// - Create Canvas and configure pixel-perfect rendering
-// - Instantiate and wire core systems (Game + input/sound/debug)
-// - Draw VIEW elements (background colour, parallax, HUD composite)
-// - Own VIEW setup: canvas size, integer scaling, parallax draw, HUD composite
-// - Boot the WORLD: load JSON, preload assets, create Game + systems
-//
-// Non-goals:
-// - Does NOT implement gameplay rules (WORLD logic lives in Level/entities)
-// - Does NOT manage camera logic inside world update (VIEW modules do)
-// - Does NOT contain entity behavior or physics setup beyond global world settings
-//
-// Architectural notes:
-// - main.js owns VIEW setup (canvas sizing, scaling, parallax, background colour).
-// - Game owns WORLD orchestration (EventBus, Level lifecycle, system wiring).
-// - world.autoStep = false for stable pixel rendering; world.step() happens during world update.
-//
-// Important:
-// - This file is loaded as a JS module (type="module").
-// - In module scope, p5 will NOT automatically find setup/draw.
-//   We MUST attach setup/draw (and input callbacks) to window.
-//
-// Notes:
-// - Browsers block audio autoplay. We unlock audio on the first click/key press.
-//
-// Dependencies (loaded in index.html before this file):
-// - p5.js
-// - p5.sound (optional but required for loadSound)
-// - p5play
 
 import { LevelLoader } from "./src/LevelLoader.js";
 import { Game } from "./src/Game.js";
@@ -50,30 +18,18 @@ import { DebugOverlay } from "./src/DebugOverlay.js";
 import { WinScreen } from "./src/ui/WinScreen.js";
 import { LoseScreen } from "./src/ui/LoseScreen.js";
 import { DebugMenu } from "./src/ui/DebugMenu.js";
-
-/* -----------------------------------------------------------
-   HIGH SCORE SYSTEM
-   -----------------------------------------------------------
-   System responsible for persisting leaderboard data locally
-   using localStorage. It is initialized here and injected into
-   Game so WORLD logic can submit scores when a level completes.
------------------------------------------------------------ */
-
 import { HighScoreManager } from "./src/HighScoreManager.js";
 
 // ------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------
 
-// p5 loadJSON is callback-based. This wrapper lets us use async/await reliably.
 function loadJSONAsync(url) {
   return new Promise((resolve, reject) => {
     loadJSON(url, resolve, reject);
   });
 }
 
-// Browsers block audio until a user gesture.
-// We unlock it once and never think about it again.
 let audioUnlocked = false;
 function unlockAudioOnce() {
   if (audioUnlocked) return;
@@ -81,7 +37,6 @@ function unlockAudioOnce() {
   if (typeof userStartAudio === "function") userStartAudio();
 }
 
-// Prevent the browser from stealing keys (space/arrows) for scrolling.
 function preventKeysThatScroll(evt) {
   const k = (evt?.key ?? "").toLowerCase();
   const scrollKeys = [" ", "arrowup", "arrowdown", "arrowleft", "arrowright"];
@@ -93,23 +48,22 @@ function preventKeysThatScroll(evt) {
 }
 
 // ------------------------------------------------------------
-// State (WORLD + VIEW glue)
+// Runtime state
 // ------------------------------------------------------------
 
-let game; // WORLD orchestrator (updates + draws world)
-let parallax; // VIEW background parallax
-let hudGfx; // VIEW overlay buffer (screen-space)
+let game;
+let parallax;
+let hudGfx;
 
-let tuningDoc; // Data: tuning.json
-let levelPkg; // Data package from LevelLoader (level + view + world + tiles)
-let assets; // Preloaded assets bundle
+let tuningDoc;
+let levelPkg;
+let assets;
 
-let cameraController; // VIEW: follow + clamp camera to world bounds
-let inputManager; // SYSTEM: keyboard snapshot
-let soundManager; // SYSTEM: audio registry
-let debugOverlay; // VIEW/SYSTEM: debug UI
+let cameraController;
+let inputManager;
+let soundManager;
+let debugOverlay;
 
-// Global debug state (shared by DebugMenu and WORLD logic)
 window.debugState = {
   boarProbes: false,
   collisionBoxes: false,
@@ -118,65 +72,52 @@ window.debugState = {
 };
 let debugMenu;
 
-/* -----------------------------------------------------------
-   HIGH SCORE SYSTEM STATE
------------------------------------------------------------ */
-
 let highScoreManager;
 let seedHighScores;
 
 let winScreen;
 let loseScreen;
-let parallaxLayers = []; // Preloaded parallax layer defs [{ img, factor }, ...]
+let parallaxLayers = [];
 
-// Make URLs absolute so they can’t accidentally resolve relative to /src/...
 const LEVELS_URL = new URL("./data/levels.json", window.location.href).href;
 const TUNING_URL = new URL("./data/tuning.json", window.location.href).href;
-
-// This must match a level id in levels.json
 const START_LEVEL_ID = "ex5_level1";
 
-// Boot flags
 let bootStarted = false;
 let bootDone = false;
 
 // ------------------------------------------------------------
-// Boot pipeline (async) — runs from setup()
+// App page state
+// ------------------------------------------------------------
+
+const APP_PAGE = {
+  MENU: "menu",
+  GAME: "game",
+  GAMEOVER: "gameover",
+  SETTINGS: "settings",
+};
+
+let currentPage = APP_PAGE.MENU;
+let gameOverMode = null; // "win" | "lose"
+let menuMessage = "";
+let settingsMessage = "Accessibility menu coming next commit";
+
+// ------------------------------------------------------------
+// Boot
 // ------------------------------------------------------------
 
 async function boot() {
   console.log("BOOT: start");
 
-  // --- Data ---
   tuningDoc = await loadJSONAsync(TUNING_URL);
-
-  /* -----------------------------------------------------------
-     Load High Score Seed Data
-
-     This JSON file provides default leaderboard entries for
-     first-time players. The HighScoreManager will copy this
-     data into localStorage ONLY if storage is empty.
-  ----------------------------------------------------------- */
-
   seedHighScores = await loadJSONAsync("./data/highscores.json");
 
   const loader = new LevelLoader(tuningDoc);
   levelPkg = await loader.load(LEVELS_URL, START_LEVEL_ID);
 
-  // --- Assets (images/animations/etc.) ---
   assets = await loadAssets(levelPkg, tuningDoc);
 
-  // --- Audio registry ---
-  // (AudioContext may still be locked until the user clicks/presses a key.)
   soundManager = new SoundManager();
-
-  /* -----------------------------------------------------------
-     HIGH SCORE SYSTEM INITIALIZATION
-
-     Creates the persistence system for leaderboards.
-     The seed JSON is only applied the first time the game
-     runs in a browser.
-  ----------------------------------------------------------- */
 
   highScoreManager = new HighScoreManager("gbda302_highscores_v2", {
     maxEntries: 5,
@@ -184,7 +125,6 @@ async function boot() {
     defaultLevelId: levelPkg?.level?.id ?? "ex5_level1",
   });
 
-  // --- Parallax layer defs (VIEW) ---
   const defs = levelPkg.level?.view?.parallax ?? [];
   parallaxLayers = defs
     .map((d) => ({
@@ -193,239 +133,324 @@ async function boot() {
     }))
     .filter((l) => l.img);
 
-  // Now that all data is ready, build the WORLD + VIEW runtime.
   initRuntime();
 
   bootDone = true;
   console.log("BOOT: done");
 }
 
-// ------------------------------------------------------------
-// Runtime init (sync) — called after boot() finishes
-// ------------------------------------------------------------
-
 function initRuntime() {
   const { viewW, viewH } = levelPkg.view;
 
-  // Resize the tiny placeholder canvas created in setup().
   resizeCanvas(viewW, viewH);
 
-  // Pixel art: never smooth, never retina-scale the main canvas.
   pixelDensity(1);
   noSmooth();
   drawingContext.imageSmoothingEnabled = false;
-
-  // Keep timing stable (p5play anims feel best when p5 is targeting 60).
   frameRate(60);
 
-  // Pixel-perfect scaling to fill the browser window by integer multiples.
-  applyIntegerScale(viewW, viewH);
-  installResizeHandler(viewW, viewH);
-
-  // Sprite rendering
-  allSprites.pixelPerfect = true;
-
-  // Physics: manual step for stable pixel rendering
-  world.autoStep = false;
-
-  // HUD buffer (screen-space)
   hudGfx = createGraphics(viewW, viewH);
-  hudGfx.noSmooth();
   hudGfx.pixelDensity(1);
+  hudGfx.noSmooth();
+  hudGfx.clear();
+  hudGfx.drawingContext.imageSmoothingEnabled = false;
 
-  // Systems
   inputManager = new InputManager();
   debugOverlay = new DebugOverlay();
   debugMenu = new DebugMenu(window.debugState);
 
-  // WORLD
   game = new Game(levelPkg, assets, {
     hudGfx,
     inputManager,
     soundManager,
     debugOverlay,
-
-    /* -------------------------------------------------------
-       Inject High Score System into Game
-
-       Game can now:
-       - submit scores
-       - check leaderboards
-       - trigger name entry screens
-    ------------------------------------------------------- */
-
     highScores: highScoreManager,
+  }).build();
+
+  window.game = game;
+
+  parallax = new ParallaxBackground(parallaxLayers, {
+    viewW,
+    viewH,
   });
 
-  game.build();
-
-  // UI overlays
+  cameraController = new CameraController(levelPkg);
   winScreen = new WinScreen(levelPkg, assets);
   loseScreen = new LoseScreen(levelPkg, assets);
 
-  // VIEW: camera follow + clamp
-  cameraController = new CameraController(levelPkg);
-  cameraController.setTarget(game.level.playerCtrl.sprite);
-  cameraController.reset();
-
-  // IMPORTANT: subscribe ONCE (not in draw)
-  game.events.on("level:restarted", () => {
-    cameraController?.reset();
-  });
-
-  // VIEW: parallax background renderer
-  parallax = new ParallaxBackground(parallaxLayers);
-
-  loop();
+  currentPage = APP_PAGE.MENU;
+  gameOverMode = null;
 }
 
 // ------------------------------------------------------------
-// p5 lifecycle (module-safe)
+// Page helpers
 // ------------------------------------------------------------
 
-function setup() {
-  // Create a tiny placeholder canvas immediately so p5 is happy,
-  // then pause the loop until our async boot finishes.
-  new Canvas(10, 10, "pixelated");
-  pixelDensity(1);
-  noLoop();
-
-  if (bootStarted) return;
-  bootStarted = true;
-
-  boot().catch((err) => {
-    console.error("BOOT FAILED:", err);
-    // loop stays stopped so the sketch doesn't spam errors
-  });
+function startNewRun() {
+  game.restart();
+  gameOverMode = null;
+  menuMessage = "";
+  currentPage = APP_PAGE.GAME;
 }
 
-function draw() {
-  if (!bootDone || !levelPkg || !game) return;
+function openSettings() {
+  currentPage = APP_PAGE.SETTINGS;
+}
 
-  const viewW = levelPkg.view.viewW;
-  const viewH = levelPkg.view.viewH;
+function returnToMenu() {
+  currentPage = APP_PAGE.MENU;
+}
 
-  // Background colour is per-level in levels.json: level.view.background
-  const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
-  background(bg[0], bg[1], bg[2]);
+function handlePageTransitions(input) {
+  if (!bootDone || !game) return;
 
-  // Collision box debug toggle
-  allSprites.debug = !!(window.debugState && window.debugState.collisionBoxes);
+  if (currentPage === APP_PAGE.MENU) {
+    if (input.enterPressed) {
+      startNewRun();
+      return;
+    }
 
-  // Parallax uses camera.x from previous frame (fine with manual stepping)
-  parallax?.draw({
-    cameraX: camera.x || 0,
-    viewW,
-    viewH,
-  });
+    if (input.loadPressed) {
+      menuMessage = "Load will be implemented in a later commit";
+      return;
+    }
 
-  // Pause game update if debug menu is open
-  if (!window.gamePaused) {
-    game.update();
-  } else {
-    // Freeze all sprite animations and physics
-    for (const s of allSprites) {
-      if (s.ani) s.ani.playing = false;
-      if (s.vel) {
-        s.vel.x = 0;
-        s.vel.y = 0;
-      }
+    if (input.settingsPressed) {
+      openSettings();
+      return;
     }
   }
 
-  // VIEW: camera follow + clamp (after update so player position is current)
-  cameraController?.update({
-    viewW,
-    viewH,
-    levelW: game.level.bounds.levelW,
-    levelH: game.level.bounds.levelH,
-  });
-  cameraController?.applyToP5Camera();
+  if (currentPage === APP_PAGE.SETTINGS) {
+    if (input.escapePressed || input.enterPressed) {
+      returnToMenu();
+      return;
+    }
+  }
 
-  // Check terminal state for HUD/overlay decisions
-  const won = game?.won === true || game?.level?.won === true;
-  const dead = game?.lost === true || game?.level?.player?.dead === true;
-  const elapsedMs = Number(game?.elapsedMs ?? game?.level?.elapsedMs ?? 0);
+  if (currentPage === APP_PAGE.GAME) {
+    if (game.won) {
+      gameOverMode = "win";
+      currentPage = APP_PAGE.GAMEOVER;
+      return;
+    }
 
-  // WORLD draw + HUD composite (hide HUD on win/lose screens)
+    if (game.lost || game.level?.player?.dead) {
+      gameOverMode = "lose";
+      currentPage = APP_PAGE.GAMEOVER;
+      return;
+    }
+  }
+
+  if (currentPage === APP_PAGE.GAMEOVER) {
+    if (input.restartPressed || input.enterPressed) {
+      startNewRun();
+      return;
+    }
+
+    if (input.escapePressed) {
+      returnToMenu();
+      return;
+    }
+  }
+}
+
+// ------------------------------------------------------------
+// Drawing helpers
+// ------------------------------------------------------------
+
+function drawMenuPage() {
+  const viewW = levelPkg?.view?.viewW ?? width;
+  const viewH = levelPkg?.view?.viewH ?? height;
+
+  background("#1b1e2b");
+
+  push();
+  noStroke();
+  fill("#0f1220");
+  rect(16, 16, viewW - 32, viewH - 32, 8);
+  pop();
+
+  push();
+  textAlign(CENTER, CENTER);
+  fill("#ffffff");
+
+  textSize(20);
+  text("FOREST RESCUE", viewW / 2, 42);
+
+  textSize(11);
+  text("ENTER - Start Game", viewW / 2, 88);
+  text("L - Load Save", viewW / 2, 106);
+  text("S - Settings", viewW / 2, 124);
+  text("T - Debug Overlay", viewW / 2, 142);
+
+  if (menuMessage) {
+    fill("#ffd166");
+    text(menuMessage, viewW / 2, 168);
+  }
+  pop();
+}
+
+function drawSettingsPage() {
+  const viewW = levelPkg?.view?.viewW ?? width;
+  const viewH = levelPkg?.view?.viewH ?? height;
+
+  background("#182028");
+
+  push();
+  noStroke();
+  fill("#0d1117");
+  rect(16, 16, viewW - 32, viewH - 32, 8);
+  pop();
+
+  push();
+  textAlign(CENTER, CENTER);
+  fill("#ffffff");
+
+  textSize(18);
+  text("SETTINGS", viewW / 2, 42);
+
+  textSize(11);
+  text("This page is the shell for the bonus menu.", viewW / 2, 82);
+  text(settingsMessage, viewW / 2, 100);
+  text("ESC or ENTER - Back to Menu", viewW / 2, 136);
+  pop();
+}
+
+function drawGamePage() {
+  background(levelPkg?.level?.view?.background ?? "#87c7ff");
+
+  const camX = cameraController?.followX?.(game.level) ?? 0;
+  if (parallax) parallax.draw(camX);
+
+  cameraController?.apply?.(game.level);
   game.draw({
-    drawHudFn:
-      won || dead
-        ? null
-        : () => {
-            camera.off();
-            try {
-              drawingContext.imageSmoothingEnabled = false;
-              imageMode(CORNER);
-              image(hudGfx, 0, 0);
-            } finally {
-              camera.on();
-              noTint();
-            }
-          },
+    drawHudFn: () => {
+      image(hudGfx, 0, 0);
+    },
   });
 
-  // Draw debug menu overlay if enabled
-  debugMenu?.draw();
+  if (debugMenu?.enabled) {
+    debugMenu.draw();
+  }
+}
 
-  if (won) {
-    winScreen?.draw({
-      elapsedMs,
+function drawGameOverPage() {
+  drawGamePage();
+
+  if (gameOverMode === "win") {
+    winScreen.draw({
+      elapsedMs: game.elapsedMs,
+      bestMs: game.bestMs,
+      lastWinMs: game.lastWinMs,
+      lastWinWasNewBest: game.lastWinWasNewBest,
       topScores: game.topScores,
+      lastRank: game.lastRank,
       awaitingName: game.awaitingName,
       nameEntry: game.nameEntry,
       nameCursor: game._nameCursor,
       blink: game._blink,
-      lastRank: game.lastRank,
       winScreenState: game.winScreenState,
     });
+  } else {
+    loseScreen.draw({
+      elapsedMs: game.elapsedMs,
+      bestMs: game.bestMs,
+      lastWinMs: game.lastWinMs,
+      lastWinWasNewBest: game.lastWinWasNewBest,
+    });
   }
-  if (dead) loseScreen?.draw({ elapsedMs, game });
+
+  push();
+  textAlign(CENTER, CENTER);
+  fill("#ffffff");
+  textSize(10);
+  text("ENTER/R - Restart    ESC - Menu", width / 2, height - 10);
+  pop();
 }
 
 // ------------------------------------------------------------
-// Optional input callbacks (audio unlock feels invisible)
+// p5 lifecycle
 // ------------------------------------------------------------
 
-function mousePressed() {
-  unlockAudioOnce();
-}
+window.preload = function () {
+  // Boot is async and starts in setup().
+};
 
-function keyPressed(evt) {
+window.setup = function () {
+  createCanvas(240, 192);
+  pixelDensity(1);
+  noSmooth();
+  drawingContext.imageSmoothingEnabled = false;
+
+  applyIntegerScale();
+  installResizeHandler(applyIntegerScale);
+
+  if (!bootStarted) {
+    bootStarted = true;
+    boot().catch((err) => {
+      console.error("BOOT FAILED:", err);
+    });
+  }
+};
+
+window.draw = function () {
+  if (!bootDone) {
+    background(20);
+    push();
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(14);
+    text("Loading...", width / 2, height / 2);
+    pop();
+    return;
+  }
+
+  inputManager.update();
+  const input = inputManager.input;
+
+  if (input.debugTogglePressed && debugOverlay) {
+    debugOverlay.toggle();
+  }
+
+  handlePageTransitions(input);
+
+  if (currentPage === APP_PAGE.GAME) {
+    game.update();
+    drawGamePage();
+    return;
+  }
+
+  if (currentPage === APP_PAGE.GAMEOVER) {
+    drawGameOverPage();
+    return;
+  }
+
+  if (currentPage === APP_PAGE.SETTINGS) {
+    drawSettingsPage();
+    return;
+  }
+
+  drawMenuPage();
+};
+
+window.keyPressed = function (evt) {
   unlockAudioOnce();
-  // Debug menu: toggle with backtick (`) key
-  if (evt && (evt.key === "`" || evt.key === "Dead")) {
+  preventKeysThatScroll(evt);
+
+  if (evt.key === "`" && debugMenu) {
     debugMenu.toggle();
     return false;
   }
-  // If debug menu is open, only handle debug menu navigation/toggles
-  if (window.gamePaused) {
-    if (debugMenu?.enabled && debugMenu.handleInput(evt)) {
-      return false;
-    }
-    // Block all other input
-    return false;
+
+  if (debugMenu?.enabled) {
+    const handled = debugMenu.handleInput(evt);
+    if (handled) return false;
   }
-  return preventKeysThatScroll(evt);
-}
 
-// Extra safety: prevent scrolling even if p5 doesn’t route a key event you expect.
-window.addEventListener(
-  "keydown",
-  (e) => {
-    const k = (e.key ?? "").toLowerCase();
-    if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
-      e.preventDefault();
-    }
-  },
-  { passive: false },
-);
+  return true;
+};
 
-// ------------------------------------------------------------
-// IMPORTANT: expose p5 entrypoints in module scope
-// ------------------------------------------------------------
-
-window.setup = setup;
-window.draw = draw;
-window.mousePressed = mousePressed;
-window.keyPressed = keyPressed;
+window.mousePressed = function () {
+  unlockAudioOnce();
+};

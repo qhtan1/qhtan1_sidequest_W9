@@ -6,17 +6,11 @@
 // - Provide a stable input snapshot object (holds + presses)
 // - Centralize key mapping so WORLD code never touches kb directly
 //
-// Contract (what Game/Player expect):
-// - left/right: held booleans
-// - jumpPressed/attackPressed: edge-triggered booleans (true for 1 frame)
-// - restartPressed/debugTogglePressed: edge-triggered booleans (true for 1 frame)
-//
 // Notes:
 // - Requires p5play global `kb`
 
 export class InputManager {
   constructor() {
-    // previous frame DOWN states (for edge detection)
     this._prevDown = {
       jump: false,
       attack: false,
@@ -26,30 +20,41 @@ export class InputManager {
       eKey: false,
       vKey: false,
       backspace: false,
+      pause: false,
+      settings: false,
+      load: false,
+      escape: false,
     };
+
     this._prevLetters = {};
 
-    // canonical snapshot (same object reused every frame)
     this._input = {
       // held
       left: false,
       right: false,
 
-      // edge-triggered (true for 1 frame)
+      // gameplay edge-triggered
       jumpPressed: false,
       attackPressed: false,
       restartPressed: false,
       debugTogglePressed: false,
+
+      // existing win flow
       enterPressed: false,
       ePressed: false,
       vPressed: false,
       typedChar: null,
       backspacePressed: false,
+
+      // menu / page flow
+      pausePressed: false,
+      settingsPressed: false,
+      loadPressed: false,
+      escapePressed: false,
     };
   }
 
   update() {
-    // If kb isn't ready yet (rare during boot), keep a safe "all false" snapshot.
     if (typeof kb === "undefined" || !kb) {
       this._input.left = false;
       this._input.right = false;
@@ -62,20 +67,18 @@ export class InputManager {
       this._input.vPressed = false;
       this._input.typedChar = null;
       this._input.backspacePressed = false;
+      this._input.pausePressed = false;
+      this._input.settingsPressed = false;
+      this._input.loadPressed = false;
+      this._input.escapePressed = false;
       return this._input;
     }
 
-    // -----------------------
     // Holds
-    // -----------------------
     const leftHeld = kb.pressing("a") || kb.pressing("left");
     const rightHeld = kb.pressing("d") || kb.pressing("right");
 
-    // -----------------------
-    // Down states (for edges)
-    // Use kb.pressing for "is currently down", then edge-detect ourselves.
-    // (Avoid kb.presses here to keep all edge logic in one place.)
-    // -----------------------
+    // Down states
     const jumpDown = kb.pressing("w") || kb.pressing("up");
     const attackDown = kb.pressing("space");
     const restartDown = kb.pressing("r");
@@ -83,10 +86,13 @@ export class InputManager {
     const enterDown = kb.pressing("enter");
     const eDown = kb.pressing("e");
     const vDown = kb.pressing("v");
+    const backspaceDown = kb.pressing("backspace");
+    const pauseDown = kb.pressing("p");
+    const settingsDown = kb.pressing("s");
+    const loadDown = kb.pressing("l");
+    const escapeDown = kb.pressing("escape");
 
-    // -----------------------
-    // Write snapshot
-    // -----------------------
+    // Snapshot write
     this._input.left = leftHeld;
     this._input.right = rightHeld;
 
@@ -95,9 +101,16 @@ export class InputManager {
     this._input.restartPressed = restartDown && !this._prevDown.restart;
     this._input.debugTogglePressed =
       debugToggleDown && !this._prevDown.debugToggle;
+
     this._input.enterPressed = enterDown && !this._prevDown.enter;
     this._input.ePressed = eDown && !this._prevDown.eKey;
     this._input.vPressed = vDown && !this._prevDown.vKey;
+    this._input.backspacePressed = backspaceDown && !this._prevDown.backspace;
+
+    this._input.pausePressed = pauseDown && !this._prevDown.pause;
+    this._input.settingsPressed = settingsDown && !this._prevDown.settings;
+    this._input.loadPressed = loadDown && !this._prevDown.load;
+    this._input.escapePressed = escapeDown && !this._prevDown.escape;
 
     // Typed character detection (A-Z)
     this._input.typedChar = null;
@@ -111,13 +124,7 @@ export class InputManager {
       this._prevLetters[letter] = isDown;
     }
 
-    // Backspace edge detection
-    const backspaceDown = kb.pressing("backspace");
-    this._input.backspacePressed = backspaceDown && !this._prevDown.backspace;
-
-    // -----------------------
-    // Store prev DOWN states
-    // -----------------------
+    // Save previous down states
     this._prevDown.jump = jumpDown;
     this._prevDown.attack = attackDown;
     this._prevDown.restart = restartDown;
@@ -126,11 +133,14 @@ export class InputManager {
     this._prevDown.eKey = eDown;
     this._prevDown.vKey = vDown;
     this._prevDown.backspace = backspaceDown;
+    this._prevDown.pause = pauseDown;
+    this._prevDown.settings = settingsDown;
+    this._prevDown.load = loadDown;
+    this._prevDown.escape = escapeDown;
 
     return this._input;
   }
 
-  // Game.js expects: inputSnap = this.input.input;
   get input() {
     return this._input;
   }
