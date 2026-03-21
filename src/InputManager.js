@@ -26,7 +26,6 @@ export class InputManager {
       eKey: false,
       vKey: false,
       backspace: false,
-      escape: false,
     };
     this._prevLetters = {};
 
@@ -46,7 +45,6 @@ export class InputManager {
       vPressed: false,
       typedChar: null,
       backspacePressed: false,
-      escapePressed: false,
     };
   }
 
@@ -64,7 +62,6 @@ export class InputManager {
       this._input.vPressed = false;
       this._input.typedChar = null;
       this._input.backspacePressed = false;
-      this._input.escapePressed = false;
       return this._input;
     }
 
@@ -76,6 +73,8 @@ export class InputManager {
 
     // -----------------------
     // Down states (for edges)
+    // Use kb.pressing for "is currently down", then edge-detect ourselves.
+    // (Avoid kb.presses here to keep all edge logic in one place.)
     // -----------------------
     const jumpDown = kb.pressing("w") || kb.pressing("up");
     const attackDown = kb.pressing("space");
@@ -84,8 +83,6 @@ export class InputManager {
     const enterDown = kb.pressing("enter");
     const eDown = kb.pressing("e");
     const vDown = kb.pressing("v");
-    const backspaceDown = kb.pressing("backspace");
-    const escapeDown = kb.pressing("escape");
 
     // -----------------------
     // Write snapshot
@@ -101,8 +98,6 @@ export class InputManager {
     this._input.enterPressed = enterDown && !this._prevDown.enter;
     this._input.ePressed = eDown && !this._prevDown.eKey;
     this._input.vPressed = vDown && !this._prevDown.vKey;
-    this._input.backspacePressed = backspaceDown && !this._prevDown.backspace;
-    this._input.escapePressed = escapeDown && !this._prevDown.escape;
 
     // Typed character detection (A-Z)
     this._input.typedChar = null;
@@ -116,6 +111,10 @@ export class InputManager {
       this._prevLetters[letter] = isDown;
     }
 
+    // Backspace edge detection
+    const backspaceDown = kb.pressing("backspace");
+    this._input.backspacePressed = backspaceDown && !this._prevDown.backspace;
+
     // -----------------------
     // Store prev DOWN states
     // -----------------------
@@ -127,7 +126,6 @@ export class InputManager {
     this._prevDown.eKey = eDown;
     this._prevDown.vKey = vDown;
     this._prevDown.backspace = backspaceDown;
-    this._prevDown.escape = escapeDown;
 
     return this._input;
   }
