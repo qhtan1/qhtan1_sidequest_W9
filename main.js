@@ -433,26 +433,17 @@ function draw() {
   const viewW = levelPkg.view.viewW;
   const viewH = levelPkg.view.viewH;
 
-  // -------------------------
-  // MENU
-  // -------------------------
+  // =========================
+  // MENU PAGE
+  // =========================
   if (currentPage === APP_PAGE.MENU) {
-    setAllSpritesVisible(false);
-
-    inputManager.update();
-    const input = inputManager.input;
-
-    if (input.enterPressed) {
-      restartToFreshGame();
-      return;
-    }
-
     drawMenuPage();
     return;
   }
 
-  // All gameplay-related pages should show sprites
-  setAllSpritesVisible(true);
+  // =========================
+  // GAME PLAY
+  // =========================
 
   const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
   background(bg[0], bg[1], bg[2]);
@@ -465,39 +456,11 @@ function draw() {
     viewH,
   });
 
-  // Read input once here for page flow.
-  // Game.update() may also manage gameplay input internally.
-  inputManager.update();
-  const input = inputManager.input;
+  // ⚠️ 不再手动 update inputManager
+  // Game 自己会处理 input
 
-  // -------------------------
-  // Pause / resume
-  // -------------------------
-  if (currentPage === APP_PAGE.GAME && input.pausePressed) {
-    currentPage = APP_PAGE.PAUSED;
-  } else if (currentPage === APP_PAGE.PAUSED && input.pausePressed) {
-    currentPage = APP_PAGE.GAME;
-  }
-
-  // -------------------------
-  // ESC back to title
-  // -------------------------
-  if (
-    (currentPage === APP_PAGE.GAME || currentPage === APP_PAGE.PAUSED) &&
-    input.escapePressed
-  ) {
-    currentPage = APP_PAGE.MENU;
-    gameOverMode = null;
-    game.restart();
-    return;
-  }
-
-  // -------------------------
-  // Update only while actively playing
-  // -------------------------
-  if (currentPage === APP_PAGE.GAME) {
-    game.update();
-  }
+  // 正常更新世界
+  game.update();
 
   cameraController?.update({
     viewW,
@@ -505,79 +468,30 @@ function draw() {
     levelW: game.level.bounds.levelW,
     levelH: game.level.bounds.levelH,
   });
+
   cameraController?.applyToP5Camera();
 
-  const won = game?.won === true || game?.level?.won === true;
-  const dead = game?.lost === true || game?.level?.player?.dead === true;
-  const elapsedMs = Number(game?.elapsedMs ?? game?.level?.elapsedMs ?? 0);
-
-  if (won) {
-    currentPage = APP_PAGE.GAMEOVER;
-    gameOverMode = "win";
-  } else if (dead) {
-    currentPage = APP_PAGE.GAMEOVER;
-    gameOverMode = "lose";
-  }
-
   game.draw({
-    drawHudFn:
-      currentPage === APP_PAGE.GAME
-        ? () => {
-            camera.off();
-            try {
-              drawingContext.imageSmoothingEnabled = false;
-              imageMode(CORNER);
-              image(hudGfx, 0, 0);
-            } finally {
-              camera.on();
-              noTint();
-            }
-          }
-        : null,
+    drawHudFn: () => {
+      camera.off();
+      try {
+        drawingContext.imageSmoothingEnabled = false;
+        imageMode(CORNER);
+        image(hudGfx, 0, 0);
+      } finally {
+        camera.on();
+        noTint();
+      }
+    },
   });
 
   debugMenu?.draw();
 
-  // -------------------------
-  // Pause overlay
-  // -------------------------
+  // =========================
+  // PAUSE OVERLAY
+  // =========================
   if (currentPage === APP_PAGE.PAUSED) {
     drawPausePage();
-    return;
-  }
-
-  // -------------------------
-  // Game over overlays
-  // -------------------------
-  if (currentPage === APP_PAGE.GAMEOVER) {
-    if (gameOverMode === "win") {
-      winScreen?.draw({
-        elapsedMs,
-        topScores: game.topScores,
-        awaitingName: game.awaitingName,
-        nameEntry: game.nameEntry,
-        nameCursor: game._nameCursor,
-        blink: game._blink,
-        lastRank: game.lastRank,
-        winScreenState: game.winScreenState,
-      });
-    }
-
-    if (gameOverMode === "lose") {
-      loseScreen?.draw({ elapsedMs, game });
-    }
-
-    if (input.restartPressed) {
-      restartToFreshGame();
-      return;
-    }
-
-    if (input.escapePressed) {
-      currentPage = APP_PAGE.MENU;
-      gameOverMode = null;
-      game.restart();
-      return;
-    }
   }
 }
 
@@ -591,19 +505,59 @@ function mousePressed() {
 
 function keyPressed(evt) {
   unlockAudioOnce();
-  // Debug menu: toggle with backtick (`) key
+
+  const k = evt.key?.toLowerCase();
+
+  // =================
+  // MENU
+  // =================
+
+  if (currentPage === APP_PAGE.MENU) {
+    if (k === "enter") {
+      currentPage = APP_PAGE.GAME;
+      game.restart();
+      return false;
+    }
+  }
+
+  // =================
+  // GAME
+  // =================
+
+  if (currentPage === APP_PAGE.GAME) {
+    if (k === "p") {
+      currentPage = APP_PAGE.PAUSED;
+      return false;
+    }
+
+    if (k === "escape") {
+      currentPage = APP_PAGE.MENU;
+      return false;
+    }
+  }
+
+  // =================
+  // PAUSE
+  // =================
+
+  if (currentPage === APP_PAGE.PAUSED) {
+    if (k === "p") {
+      currentPage = APP_PAGE.GAME;
+      return false;
+    }
+
+    if (k === "escape") {
+      currentPage = APP_PAGE.MENU;
+      return false;
+    }
+  }
+
+  // debug menu
   if (evt && (evt.key === "`" || evt.key === "Dead")) {
     debugMenu.toggle();
     return false;
   }
-  // If debug menu is open, only handle debug menu navigation/toggles
-  if (window.gamePaused) {
-    if (debugMenu?.enabled && debugMenu.handleInput(evt)) {
-      return false;
-    }
-    // Block all other input
-    return false;
-  }
+
   return preventKeysThatScroll(evt);
 }
 
