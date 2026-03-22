@@ -293,8 +293,14 @@ function drawMenuPage() {
   const viewW = levelPkg.view.viewW;
   const viewH = levelPkg.view.viewH;
 
-  push();
-  camera.off();
+  // Force a clean screen-space drawing state
+  resetMatrix();
+  if (camera && typeof camera.off === "function") camera.off();
+
+  noTint();
+  imageMode(CORNER);
+  rectMode(CORNER);
+  textAlign(CENTER, CENTER);
 
   const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
   background(bg[0], bg[1], bg[2]);
@@ -318,8 +324,6 @@ function drawMenuPage() {
   rect(panelX, panelY, panelW, panelH, 8);
 
   fill(255);
-  textAlign(CENTER, CENTER);
-
   textSize(20);
   text("FOREST RESCUE", viewW / 2, viewH / 2 - 28);
 
@@ -327,9 +331,6 @@ function drawMenuPage() {
   text("ENTER - Start", viewW / 2, viewH / 2 + 2);
   text("P - Pause in game", viewW / 2, viewH / 2 + 18);
   text("ESC - Return to title", viewW / 2, viewH / 2 + 32);
-
-  camera.on();
-  pop();
 }
 
 function drawPausePage() {
@@ -506,6 +507,11 @@ function keyPressed(evt) {
     }
     if (k === "escape") {
       setAllSpritesVisible(false);
+
+      if (camera && typeof camera.off === "function") camera.off();
+      resetMatrix();
+      noTint();
+
       currentPage = APP_PAGE.MENU;
       return false;
     }
@@ -519,6 +525,11 @@ function keyPressed(evt) {
     }
     if (k === "escape") {
       setAllSpritesVisible(false);
+
+      if (camera && typeof camera.off === "function") camera.off();
+      resetMatrix();
+      noTint();
+
       currentPage = APP_PAGE.MENU;
       return false;
     }
