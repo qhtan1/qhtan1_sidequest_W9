@@ -51,6 +51,7 @@ import { WinScreen } from "./src/ui/WinScreen.js";
 import { LoseScreen } from "./src/ui/LoseScreen.js";
 import { MenuScreen } from "./src/ui/MenuScreen.js";
 import { PauseScreen } from "./src/ui/PauseScreen.js";
+import { LoadScreen } from "./src/ui/LoadScreen.js";
 import { DebugMenu } from "./src/ui/DebugMenu.js";
 
 /* -----------------------------------------------------------
@@ -133,14 +134,18 @@ let winScreen;
 let loseScreen;
 let menuScreen;
 let pauseScreen;
+let loadScreen;
 let parallaxLayers = []; // Preloaded parallax layer defs [{ img, factor }, ...]
 
 // Page state machine: "menu" | "playing"
-// (win/lose/pause are overlays drawn on top of "playing", not separate states)
+// (win/lose/pause/load are overlays drawn on top of "playing", not separate states)
 let gameState = "menu";
 
 // Pause flag (separate from debug menu pause)
 let gamePaused = false;
+
+// Load-screen overlay flag: true while the "LOAD SAVE" panel is open
+let gameLoading = false;
 
 // Track whether game.build() has been called at least once
 // (ESC resets this to false so re-entering always gets a fresh world)
@@ -152,6 +157,15 @@ let _notifFrames = 0;
 function _showNotif(text, frames = 120) {
   _notifText  = text;
   _notifFrames = frames;
+}
+
+// Format milliseconds as MM:SS.hs (reused for notifications)
+function _fmtMs(ms) {
+  ms = Number(ms) || 0;
+  const m  = Math.floor(ms / 60000);
+  const s  = Math.floor((ms % 60000) / 1000);
+  const hs = Math.floor((ms % 1000) / 10);
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(hs).padStart(2,"0")}`;
 }
 
 // Make URLs absolute so they can’t accidentally resolve relative to /src/...
@@ -308,6 +322,7 @@ function initRuntime() {
   loseScreen = new LoseScreen(levelPkg, assets);
   menuScreen = new MenuScreen(levelPkg, assets);
   pauseScreen = new PauseScreen(levelPkg, assets);
+  loadScreen = new LoadScreen(levelPkg, assets);
 
   // VIEW: camera follow + clamp (target set after build())
   cameraController = new CameraController(levelPkg);
@@ -392,12 +407,12 @@ function draw() {
     viewH,
   });
 
-  // Pause game update if paused or debug menu is open
-  const isPaused = gamePaused || !!window.gamePaused;
+  // Pause game update if paused, loading, or debug menu is open
+  const isPaused = gamePaused || gameLoading || !!window.gamePaused;
   if (!isPaused) {
     game.update();
   } else {
-    // Freeze all sprite animations and physics while paused
+    // Freeze all sprite animations and physics while paused/loading
     for (const s of allSprites) {
       if (s.ani) s.ani.playing = false;
       if (s.vel) {
@@ -442,9 +457,14 @@ function draw() {
   // Draw debug menu overlay if enabled
   debugMenu?.draw();
 
-  // Draw pause overlay (on top of game world, under win/lose screens)
-  if (gamePaused && !won && !dead) {
+  // Draw pause overlay (on top of game world, under win/lose/load screens)
+  if (gamePaused && !won && !dead && !gameLoading) {
     pauseScreen?.draw();
+  }
+
+  // Draw load-save overlay (on top of everything except win/lose)
+  if (gameLoading && !won && !dead) {
+    loadScreen?.draw(saveManager?.load() ?? null);
   }
 
   if (won) {
@@ -493,12 +513,39 @@ function keyPressed(evt) {
     return false;
   }
 
-  // ESC → return to menu
+  // ESC → if load screen is open, close it; otherwise return to menu
   if (evt && evt.key === "Escape" && gameState === "playing") {
+    if (gameLoading) {
+      // Close the load screen and resume game
+      gameLoading = false;
+      // Re-enable sprite animations that were frozen
+      for (const s of allSprites) {
+        if (s.ani) s.ani.playing = true;
+      }
+      return false;
+    }
     allSprites.remove(); // destroy all p5play sprites so none bleed into menu
     gameBuilt = false;   // force a fresh game.build() on next Enter
     gamePaused = false;
+    gameLoading = false;
     gameState = "menu";
+    return false;
+  }
+
+  // ENTER → if load screen is open, confirm the load
+  if (evt && evt.key === "Enter" && gameLoading && gameState === "playing") {
+    const sv = saveManager?.load();
+    if (sv) {
+      game.restart();                           // reset level, player, timer
+      game.level.elapsedMs = sv.elapsedMs ?? 0; // restore saved timer
+      // Re-enable animations (restart may have left them frozen)
+      for (const s of allSprites) {
+        if (s.ani) s.ani.playing = true;
+      }
+      _showNotif(`LOADED: ${sv.leavesRescued}/${sv.totalLeaves}  ${_fmtMs(sv.elapsedMs)}`);
+    }
+    gameLoading = false;
+    gamePaused = false;
     return false;
   }
 
@@ -514,16 +561,10 @@ function keyPressed(evt) {
     return false;
   }
 
-  // L → load last save (display the saved data; restart is manual)
-  if ((evt?.key === "l" || evt?.key === "L") && gameState === "playing") {
-    const sv = saveManager?.load();
-    if (sv) {
-      const mins = String(Math.floor(sv.elapsedMs / 60000)).padStart(2, "0");
-      const secs = String(Math.floor((sv.elapsedMs % 60000) / 1000)).padStart(2, "0");
-      _showNotif(`LOADED: ${sv.leavesRescued}/${sv.totalLeaves}  ${mins}:${secs}`, 180);
-    } else {
-      _showNotif("NO SAVE FOUND");
-    }
+  // L → open the load-save overlay (only during active play, not when already loading)
+  if ((evt?.key === "l" || evt?.key === "L") && gameState === "playing" && !gameLoading) {
+    gameLoading = true;
+    gamePaused = false; // load screen replaces pause; no need for both
     return false;
   }
 
