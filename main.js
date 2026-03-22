@@ -289,21 +289,57 @@ function drawMenuPage() {
   const viewW = levelPkg.view.viewW;
   const viewH = levelPkg.view.viewH;
 
-  background(20, 20, 28);
+  const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
+  background(bg[0], bg[1], bg[2]);
+
+  // Draw only parallax layers for a clean title screen
+  parallax?.draw({
+    cameraX: 0,
+    viewW,
+    viewH,
+  });
+
+  // Darken background slightly
+  push();
+  noStroke();
+  fill(0, 0, 0, 120);
+  rect(0, 0, viewW, viewH);
+  pop();
+
+  // Main panel
+  const panelX = 28;
+  const panelY = 24;
+  const panelW = viewW - 56;
+  const panelH = viewH - 48;
 
   push();
-  fill(0, 0, 0, 200);
   noStroke();
-  rect(20, 20, viewW - 40, viewH - 40, 8);
+  fill(8, 8, 12, 235);
+  rect(panelX, panelY, panelW, panelH, 8);
+  pop();
 
+  // Decorative top and bottom strips using existing tile texture
+  if (assets?.images?.groundTile) {
+    const tile = assets.images.groundTile;
+    const tileW = 16;
+    const tileH = 16;
+
+    for (let x = panelX + 12; x < panelX + panelW - 12; x += tileW) {
+      image(tile, x, panelY + 10, tileW, tileH);
+      image(tile, x, panelY + panelH - 26, tileW, tileH);
+    }
+  }
+
+  // Title + instructions
+  push();
   fill(255);
   textAlign(CENTER, CENTER);
 
   textSize(20);
-  text("FOREST RESCUE", viewW / 2, viewH / 2 - 26);
+  text("FOREST RESCUE", viewW / 2, viewH / 2 - 24);
 
   textSize(10);
-  text("Press ENTER to Start", viewW / 2, viewH / 2 + 8);
+  text("Press ENTER to Start", viewW / 2, viewH / 2 + 12);
   pop();
 }
 
@@ -329,10 +365,11 @@ function setup() {
 
 function draw() {
   if (!bootDone || !levelPkg || !game) return;
-  inputManager.update();
-  const input = inputManager.input;
 
   if (currentPage === APP_PAGE.MENU) {
+    inputManager.update();
+    const input = inputManager.input;
+
     if (input.enterPressed) {
       currentPage = APP_PAGE.GAME;
       game.restart();
@@ -419,7 +456,15 @@ function draw() {
       winScreenState: game.winScreenState,
     });
   }
-  if (dead) loseScreen?.draw({ elapsedMs, game });
+
+  if (dead) {
+    loseScreen?.draw({ elapsedMs, game });
+
+    const input = inputManager.input;
+    if (input?.restartPressed) {
+      game.restart();
+    }
+  }
 }
 
 // ------------------------------------------------------------
