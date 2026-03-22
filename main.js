@@ -293,6 +293,9 @@ function drawMenuPage() {
   const viewW = levelPkg.view.viewW;
   const viewH = levelPkg.view.viewH;
 
+  push();
+  camera.off();
+
   const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
   background(bg[0], bg[1], bg[2]);
 
@@ -302,34 +305,30 @@ function drawMenuPage() {
     viewH,
   });
 
-  push();
   noStroke();
   fill(0, 0, 0, 150);
   rect(0, 0, viewW, viewH);
-  pop();
 
   const panelX = 28;
   const panelY = 22;
   const panelW = viewW - 56;
   const panelH = viewH - 44;
 
-  push();
-  noStroke();
   fill(10, 10, 16, 230);
   rect(panelX, panelY, panelW, panelH, 8);
-  pop();
 
-  push();
   fill(255);
   textAlign(CENTER, CENTER);
 
   textSize(20);
-  text("FOREST RESCUE BUILD 7", viewW / 2, viewH / 2 - 28);
+  text("FOREST RESCUE", viewW / 2, viewH / 2 - 28);
 
   textSize(10);
   text("ENTER - Start", viewW / 2, viewH / 2 + 2);
   text("P - Pause in game", viewW / 2, viewH / 2 + 18);
   text("ESC - Return to title", viewW / 2, viewH / 2 + 32);
+
+  camera.on();
   pop();
 }
 
