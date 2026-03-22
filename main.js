@@ -430,50 +430,75 @@ function setup() {
 function draw() {
   if (!bootDone || !levelPkg || !game) return;
 
+  const viewW = levelPkg.view.viewW;
+  const viewH = levelPkg.view.viewH;
+
+  // -------------------------
+  // MENU
+  // -------------------------
   if (currentPage === APP_PAGE.MENU) {
+    setAllSpritesVisible(false);
+
     inputManager.update();
     const input = inputManager.input;
 
     if (input.enterPressed) {
-      currentPage = APP_PAGE.GAME;
-      game.restart();
+      restartToFreshGame();
+      return;
     }
 
     drawMenuPage();
     return;
   }
-  const viewW = levelPkg.view.viewW;
-  const viewH = levelPkg.view.viewH;
 
-  // Background colour is per-level in levels.json: level.view.background
+  // All gameplay-related pages should show sprites
+  setAllSpritesVisible(true);
+
   const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
   background(bg[0], bg[1], bg[2]);
 
-  // Collision box debug toggle
   allSprites.debug = !!(window.debugState && window.debugState.collisionBoxes);
 
-  // Parallax uses camera.x from previous frame (fine with manual stepping)
   parallax?.draw({
     cameraX: camera.x || 0,
     viewW,
     viewH,
   });
 
-  // Pause game update if debug menu is open
-  if (!window.gamePaused) {
-    game.update();
-  } else {
-    // Freeze all sprite animations and physics
-    for (const s of allSprites) {
-      if (s.ani) s.ani.playing = false;
-      if (s.vel) {
-        s.vel.x = 0;
-        s.vel.y = 0;
-      }
-    }
+  // Read input once here for page flow.
+  // Game.update() may also manage gameplay input internally.
+  inputManager.update();
+  const input = inputManager.input;
+
+  // -------------------------
+  // Pause / resume
+  // -------------------------
+  if (currentPage === APP_PAGE.GAME && input.pausePressed) {
+    currentPage = APP_PAGE.PAUSED;
+  } else if (currentPage === APP_PAGE.PAUSED && input.pausePressed) {
+    currentPage = APP_PAGE.GAME;
   }
 
-  // VIEW: camera follow + clamp (after update so player position is current)
+  // -------------------------
+  // ESC back to title
+  // -------------------------
+  if (
+    (currentPage === APP_PAGE.GAME || currentPage === APP_PAGE.PAUSED) &&
+    input.escapePressed
+  ) {
+    currentPage = APP_PAGE.MENU;
+    gameOverMode = null;
+    game.restart();
+    return;
+  }
+
+  // -------------------------
+  // Update only while actively playing
+  // -------------------------
+  if (currentPage === APP_PAGE.GAME) {
+    game.update();
+  }
+
   cameraController?.update({
     viewW,
     viewH,
@@ -482,17 +507,22 @@ function draw() {
   });
   cameraController?.applyToP5Camera();
 
-  // Check terminal state for HUD/overlay decisions
   const won = game?.won === true || game?.level?.won === true;
   const dead = game?.lost === true || game?.level?.player?.dead === true;
   const elapsedMs = Number(game?.elapsedMs ?? game?.level?.elapsedMs ?? 0);
 
-  // WORLD draw + HUD composite (hide HUD on win/lose screens)
+  if (won) {
+    currentPage = APP_PAGE.GAMEOVER;
+    gameOverMode = "win";
+  } else if (dead) {
+    currentPage = APP_PAGE.GAMEOVER;
+    gameOverMode = "lose";
+  }
+
   game.draw({
     drawHudFn:
-      won || dead
-        ? null
-        : () => {
+      currentPage === APP_PAGE.GAME
+        ? () => {
             camera.off();
             try {
               drawingContext.imageSmoothingEnabled = false;
@@ -502,31 +532,51 @@ function draw() {
               camera.on();
               noTint();
             }
-          },
+          }
+        : null,
   });
 
-  // Draw debug menu overlay if enabled
   debugMenu?.draw();
 
-  if (won) {
-    winScreen?.draw({
-      elapsedMs,
-      topScores: game.topScores,
-      awaitingName: game.awaitingName,
-      nameEntry: game.nameEntry,
-      nameCursor: game._nameCursor,
-      blink: game._blink,
-      lastRank: game.lastRank,
-      winScreenState: game.winScreenState,
-    });
+  // -------------------------
+  // Pause overlay
+  // -------------------------
+  if (currentPage === APP_PAGE.PAUSED) {
+    drawPausePage();
+    return;
   }
 
-  if (dead) {
-    loseScreen?.draw({ elapsedMs, game });
+  // -------------------------
+  // Game over overlays
+  // -------------------------
+  if (currentPage === APP_PAGE.GAMEOVER) {
+    if (gameOverMode === "win") {
+      winScreen?.draw({
+        elapsedMs,
+        topScores: game.topScores,
+        awaitingName: game.awaitingName,
+        nameEntry: game.nameEntry,
+        nameCursor: game._nameCursor,
+        blink: game._blink,
+        lastRank: game.lastRank,
+        winScreenState: game.winScreenState,
+      });
+    }
 
-    const input = inputManager.input;
-    if (input?.restartPressed) {
+    if (gameOverMode === "lose") {
+      loseScreen?.draw({ elapsedMs, game });
+    }
+
+    if (input.restartPressed) {
+      restartToFreshGame();
+      return;
+    }
+
+    if (input.escapePressed) {
+      currentPage = APP_PAGE.MENU;
+      gameOverMode = null;
       game.restart();
+      return;
     }
   }
 }
