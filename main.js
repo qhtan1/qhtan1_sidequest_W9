@@ -50,6 +50,7 @@ import { DebugOverlay } from "./src/DebugOverlay.js";
 import { WinScreen } from "./src/ui/WinScreen.js";
 import { LoseScreen } from "./src/ui/LoseScreen.js";
 import { MenuScreen } from "./src/ui/MenuScreen.js";
+import { PauseScreen } from "./src/ui/PauseScreen.js";
 import { DebugMenu } from "./src/ui/DebugMenu.js";
 
 /* -----------------------------------------------------------
@@ -129,11 +130,15 @@ let seedHighScores;
 let winScreen;
 let loseScreen;
 let menuScreen;
+let pauseScreen;
 let parallaxLayers = []; // Preloaded parallax layer defs [{ img, factor }, ...]
 
 // Page state machine: "menu" | "playing"
-// (win/lose are overlays drawn on top of "playing", not separate states)
+// (win/lose/pause are overlays drawn on top of "playing", not separate states)
 let gameState = "menu";
+
+// Pause flag (separate from debug menu pause)
+let gamePaused = false;
 
 // Make URLs absolute so they can’t accidentally resolve relative to /src/...
 const LEVELS_URL = new URL("./data/levels.json", window.location.href).href;
@@ -272,6 +277,7 @@ function initRuntime() {
   winScreen = new WinScreen(levelPkg, assets);
   loseScreen = new LoseScreen(levelPkg, assets);
   menuScreen = new MenuScreen(levelPkg, assets);
+  pauseScreen = new PauseScreen(levelPkg, assets);
 
   // VIEW: camera follow + clamp (target set after build())
   cameraController = new CameraController(levelPkg);
@@ -347,11 +353,12 @@ function draw() {
     viewH,
   });
 
-  // Pause game update if debug menu is open
-  if (!window.gamePaused) {
+  // Pause game update if paused or debug menu is open
+  const isPaused = gamePaused || !!window.gamePaused;
+  if (!isPaused) {
     game.update();
   } else {
-    // Freeze all sprite animations and physics
+    // Freeze all sprite animations and physics while paused
     for (const s of allSprites) {
       if (s.ani) s.ani.playing = false;
       if (s.vel) {
@@ -396,6 +403,11 @@ function draw() {
   // Draw debug menu overlay if enabled
   debugMenu?.draw();
 
+  // Draw pause overlay (on top of game world, under win/lose screens)
+  if (gamePaused && !won && !dead) {
+    pauseScreen?.draw();
+  }
+
   if (won) {
     winScreen?.draw({
       elapsedMs,
@@ -420,6 +432,20 @@ function keyPressed(evt) {
   if (evt && evt.key === "\\" && gameState === "playing" && game && !game.won && !game.lost) {
     game.events?.emit("level:won");
     return false;
+  }
+
+  // Pause toggle: P key (only during active gameplay)
+  if (evt && evt.key === "p" || evt?.key === "P") {
+    if (gameState === "playing" && game && !game.won && !game.lost) {
+      gamePaused = !gamePaused;
+      // Re-enable sprite animations when resuming
+      if (!gamePaused) {
+        for (const s of allSprites) {
+          if (s.ani) s.ani.playing = true;
+        }
+      }
+      return false;
+    }
   }
 
   // Debug menu: toggle with backtick (`) key

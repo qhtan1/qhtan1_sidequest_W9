@@ -85,9 +85,9 @@ export class MenuScreen {
     // Divider hint
     this._drawOutlined("- - - - - - - - - - -", Math.round((viewW - 21 * this.GLYPH_W) / 2), 62, "#334455");
 
-    // Controls
-    const ctrl1 = "Arrows  move    Z  attack";
-    const ctrl2 = "Collect leaves to rescue friends";
+    // Controls (keep each line ≤ 20 chars so it fits inside the panel)
+    const ctrl1 = "Arrows:move  Z:atk";
+    const ctrl2 = "Collect all leaves!";
     const txC1 = Math.round((viewW - ctrl1.length * this.GLYPH_W) / 2);
     const txC2 = Math.round((viewW - ctrl2.length * this.GLYPH_W) / 2);
     this._drawOutlined(ctrl1, txC1, 74, "#88aacc");
