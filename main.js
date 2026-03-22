@@ -323,7 +323,7 @@ function drawMenuPage() {
   textAlign(CENTER, CENTER);
 
   textSize(20);
-  text("FOREST RESCUE", viewW / 2, viewH / 2 - 28);
+  text("FOREST RESCUE BUILD 7", viewW / 2, viewH / 2 - 28);
 
   textSize(10);
   text("ENTER - Start", viewW / 2, viewH / 2 + 2);
@@ -364,6 +364,7 @@ function drawPausePage() {
 function setup() {
   // Create a tiny placeholder canvas immediately so p5 is happy,
   // then pause the loop until our async boot finishes.
+  console.log("BUILD 7 LOADED");
   new Canvas(10, 10, "pixelated");
   pixelDensity(1);
   noLoop();
