@@ -134,7 +134,7 @@ const LEVELS_URL = new URL("./data/levels.json", window.location.href).href;
 const TUNING_URL = new URL("./data/tuning.json", window.location.href).href;
 
 // This must match a level id in levels.json
-const START_LEVEL_ID = "ex5_level1";
+const START_LEVEL_ID = "ffa_level1";
 
 // Boot flags
 let bootStarted = false;

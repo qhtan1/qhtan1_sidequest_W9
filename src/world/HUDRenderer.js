@@ -3,13 +3,12 @@
 //
 // Responsibilities:
 // - Draw HUD into a screen-space graphics buffer (hudGfx)
-// - Redraw only when values change (score/health)
+// - Redraw only when values change (score/health/timer)
 // - Keep all HUD code out of Level's core simulation logic
 //
 // Non-goals:
 // - Does NOT move camera or draw world sprites
 // - Does NOT change game rules
-// - Does NOT render timer (time is tracked in Level/Game but not displayed here)
 
 export function maybeRedrawHUD(level) {
   if (!level?.hudGfx || !level.assets?.fontImg) return;
@@ -19,15 +18,20 @@ export function maybeRedrawHUD(level) {
   const maxHealth =
     level.player?.maxHealth ?? level.playerCtrl?.player?.maxHealth ?? 0;
 
+  // Timer: bucket into whole seconds so we don't redraw every single frame
+  const timerSec = Math.floor((level.elapsedMs ?? 0) / 1000);
+
   if (
     level.score !== level._lastScore ||
     health !== level._lastHealth ||
-    maxHealth !== level._lastMaxHealth
+    maxHealth !== level._lastMaxHealth ||
+    timerSec !== level._lastTimerSec
   ) {
     redrawHUD(level);
     level._lastScore = level.score;
     level._lastHealth = health;
     level._lastMaxHealth = maxHealth;
+    level._lastTimerSec = timerSec;
   }
 }
 
@@ -114,4 +118,12 @@ export function redrawHUD(level) {
     const col = i < health ? "#ff5050" : "#783030";
     drawOutlined(heartChar, x, heartY, col);
   }
+
+  // Timer (top-center, mm:ss format)
+  const totalSec = Math.floor((level.elapsedMs ?? 0) / 1000);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  const timerStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  const timerX = Math.round((g.width - timerStr.length * GLYPH_W) / 2);
+  drawOutlined(timerStr, timerX, 6, "#e0e0ff");
 }
