@@ -285,6 +285,7 @@ function initRuntime() {
   // VIEW: parallax background renderer
   parallax = new ParallaxBackground(parallaxLayers);
   currentPage = APP_PAGE.MENU;
+  setAllSpritesVisible(false);
   loop();
 }
 
@@ -355,6 +356,12 @@ function drawPausePage() {
 
   camera.on();
   pop();
+}
+
+function setAllSpritesVisible(isVisible) {
+  for (const s of allSprites) {
+    s.visible = isVisible;
+  }
 }
 
 // ------------------------------------------------------------
@@ -484,6 +491,7 @@ function keyPressed(evt) {
   // MENU
   if (currentPage === APP_PAGE.MENU) {
     if (k === "enter") {
+      setAllSpritesVisible(true);
       currentPage = APP_PAGE.GAME;
       game.restart();
       return false;
@@ -498,6 +506,7 @@ function keyPressed(evt) {
       return false;
     }
     if (k === "escape") {
+      setAllSpritesVisible(false);
       currentPage = APP_PAGE.MENU;
       return false;
     }
@@ -510,6 +519,7 @@ function keyPressed(evt) {
       return false;
     }
     if (k === "escape") {
+      setAllSpritesVisible(false);
       currentPage = APP_PAGE.MENU;
       return false;
     }
