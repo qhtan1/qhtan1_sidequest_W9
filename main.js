@@ -142,9 +142,12 @@ let bootDone = false;
 const APP_PAGE = {
   MENU: "menu",
   GAME: "game",
+  PAUSED: "paused",
+  GAMEOVER: "gameover",
 };
 
 let currentPage = APP_PAGE.MENU;
+let gameOverMode = null; // "win" | "lose"
 
 // ------------------------------------------------------------
 // Boot pipeline (async) — runs from setup()
@@ -285,6 +288,19 @@ function initRuntime() {
   loop();
 }
 
+function setAllSpritesVisible(isVisible) {
+  for (const s of allSprites) {
+    s.visible = isVisible;
+  }
+}
+
+function restartToFreshGame() {
+  setAllSpritesVisible(true);
+  game.restart();
+  gameOverMode = null;
+  currentPage = APP_PAGE.GAME;
+}
+
 function drawMenuPage() {
   const viewW = levelPkg.view.viewW;
   const viewH = levelPkg.view.viewH;
@@ -292,54 +308,102 @@ function drawMenuPage() {
   const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
   background(bg[0], bg[1], bg[2]);
 
-  // Draw only parallax layers for a clean title screen
   parallax?.draw({
     cameraX: 0,
     viewW,
     viewH,
   });
 
-  // Darken background slightly
   push();
   noStroke();
   fill(0, 0, 0, 120);
   rect(0, 0, viewW, viewH);
   pop();
 
-  // Main panel
-  const panelX = 28;
-  const panelY = 24;
-  const panelW = viewW - 56;
-  const panelH = viewH - 48;
+  const panelX = 24;
+  const panelY = 20;
+  const panelW = viewW - 48;
+  const panelH = viewH - 40;
 
-  push();
-  noStroke();
-  fill(8, 8, 12, 235);
-  rect(panelX, panelY, panelW, panelH, 8);
-  pop();
+  // Tile-style panel body
+  if (assets?.images?.groundTileDeep) {
+    const deepTile = assets.images.groundTileDeep;
+    const tileSize = 16;
 
-  // Decorative top and bottom strips using existing tile texture
+    for (let y = panelY; y < panelY + panelH; y += tileSize) {
+      for (let x = panelX; x < panelX + panelW; x += tileSize) {
+        image(deepTile, x, y, tileSize, tileSize);
+      }
+    }
+  } else {
+    push();
+    noStroke();
+    fill(12, 12, 18, 235);
+    rect(panelX, panelY, panelW, panelH, 8);
+    pop();
+  }
+
+  // Decorative top/bottom strips
   if (assets?.images?.groundTile) {
     const tile = assets.images.groundTile;
     const tileW = 16;
     const tileH = 16;
 
-    for (let x = panelX + 12; x < panelX + panelW - 12; x += tileW) {
-      image(tile, x, panelY + 10, tileW, tileH);
-      image(tile, x, panelY + panelH - 26, tileW, tileH);
+    for (let x = panelX; x < panelX + panelW; x += tileW) {
+      image(tile, x, panelY, tileW, tileH);
+      image(tile, x, panelY + panelH - tileH, tileW, tileH);
     }
   }
 
-  // Title + instructions
+  // Decorative left/right strips
+  if (assets?.images?.wallL && assets?.images?.wallR) {
+    const wallL = assets.images.wallL;
+    const wallR = assets.images.wallR;
+    const tileW = 16;
+    const tileH = 16;
+
+    for (let y = panelY + 16; y < panelY + panelH - 16; y += tileH) {
+      image(wallL, panelX, y, tileW, tileH);
+      image(wallR, panelX + panelW - tileW, y, tileW, tileH);
+    }
+  }
+
   push();
   fill(255);
   textAlign(CENTER, CENTER);
 
   textSize(20);
-  text("FOREST RESCUE", viewW / 2, viewH / 2 - 24);
+  text("FOREST RESCUE", viewW / 2, viewH / 2 - 26);
 
   textSize(10);
-  text("Press ENTER to Start", viewW / 2, viewH / 2 + 12);
+  text("ENTER - Start", viewW / 2, viewH / 2 + 6);
+  text("P - Pause during game", viewW / 2, viewH / 2 + 22);
+  text("ESC - Return to title", viewW / 2, viewH / 2 + 36);
+  pop();
+}
+
+function drawPausePage() {
+  const viewW = levelPkg.view.viewW;
+  const viewH = levelPkg.view.viewH;
+
+  push();
+  camera.off();
+
+  noStroke();
+  fill(0, 0, 0, 150);
+  rect(0, 0, viewW, viewH);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+
+  textSize(18);
+  text("PAUSED", viewW / 2, viewH / 2 - 14);
+
+  textSize(10);
+  text("Press P to Resume", viewW / 2, viewH / 2 + 10);
+  text("Press ESC for Title", viewW / 2, viewH / 2 + 24);
+
+  camera.on();
   pop();
 }
 
