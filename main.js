@@ -288,19 +288,6 @@ function initRuntime() {
   loop();
 }
 
-function setAllSpritesVisible(isVisible) {
-  for (const s of allSprites) {
-    s.visible = isVisible;
-  }
-}
-
-function restartToFreshGame() {
-  setAllSpritesVisible(true);
-  game.restart();
-  gameOverMode = null;
-  currentPage = APP_PAGE.GAME;
-}
-
 function drawMenuPage() {
   const viewW = levelPkg.view.viewW;
   const viewH = levelPkg.view.viewH;
@@ -316,69 +303,32 @@ function drawMenuPage() {
 
   push();
   noStroke();
-  fill(0, 0, 0, 120);
+  fill(0, 0, 0, 150);
   rect(0, 0, viewW, viewH);
   pop();
 
-  const panelX = 24;
-  const panelY = 20;
-  const panelW = viewW - 48;
-  const panelH = viewH - 40;
+  const panelX = 28;
+  const panelY = 22;
+  const panelW = viewW - 56;
+  const panelH = viewH - 44;
 
-  // Tile-style panel body
-  if (assets?.images?.groundTileDeep) {
-    const deepTile = assets.images.groundTileDeep;
-    const tileSize = 16;
-
-    for (let y = panelY; y < panelY + panelH; y += tileSize) {
-      for (let x = panelX; x < panelX + panelW; x += tileSize) {
-        image(deepTile, x, y, tileSize, tileSize);
-      }
-    }
-  } else {
-    push();
-    noStroke();
-    fill(12, 12, 18, 235);
-    rect(panelX, panelY, panelW, panelH, 8);
-    pop();
-  }
-
-  // Decorative top/bottom strips
-  if (assets?.images?.groundTile) {
-    const tile = assets.images.groundTile;
-    const tileW = 16;
-    const tileH = 16;
-
-    for (let x = panelX; x < panelX + panelW; x += tileW) {
-      image(tile, x, panelY, tileW, tileH);
-      image(tile, x, panelY + panelH - tileH, tileW, tileH);
-    }
-  }
-
-  // Decorative left/right strips
-  if (assets?.images?.wallL && assets?.images?.wallR) {
-    const wallL = assets.images.wallL;
-    const wallR = assets.images.wallR;
-    const tileW = 16;
-    const tileH = 16;
-
-    for (let y = panelY + 16; y < panelY + panelH - 16; y += tileH) {
-      image(wallL, panelX, y, tileW, tileH);
-      image(wallR, panelX + panelW - tileW, y, tileW, tileH);
-    }
-  }
+  push();
+  noStroke();
+  fill(10, 10, 16, 230);
+  rect(panelX, panelY, panelW, panelH, 8);
+  pop();
 
   push();
   fill(255);
   textAlign(CENTER, CENTER);
 
   textSize(20);
-  text("FOREST RESCUE", viewW / 2, viewH / 2 - 26);
+  text("FOREST RESCUE", viewW / 2, viewH / 2 - 28);
 
   textSize(10);
-  text("ENTER - Start", viewW / 2, viewH / 2 + 6);
-  text("P - Pause during game", viewW / 2, viewH / 2 + 22);
-  text("ESC - Return to title", viewW / 2, viewH / 2 + 36);
+  text("ENTER - Start", viewW / 2, viewH / 2 + 2);
+  text("P - Pause in game", viewW / 2, viewH / 2 + 18);
+  text("ESC - Return to title", viewW / 2, viewH / 2 + 32);
   pop();
 }
 
@@ -390,18 +340,18 @@ function drawPausePage() {
   camera.off();
 
   noStroke();
-  fill(0, 0, 0, 150);
+  fill(0, 0, 0, 160);
   rect(0, 0, viewW, viewH);
 
   fill(255);
   textAlign(CENTER, CENTER);
 
   textSize(18);
-  text("PAUSED", viewW / 2, viewH / 2 - 14);
+  text("PAUSED", viewW / 2, viewH / 2 - 18);
 
   textSize(10);
-  text("Press P to Resume", viewW / 2, viewH / 2 + 10);
-  text("Press ESC for Title", viewW / 2, viewH / 2 + 24);
+  text("P - Resume", viewW / 2, viewH / 2 + 6);
+  text("ESC - Return to Title", viewW / 2, viewH / 2 + 20);
 
   camera.on();
   pop();
@@ -434,16 +384,12 @@ function draw() {
   const viewH = levelPkg.view.viewH;
 
   // =========================
-  // MENU PAGE
+  // MENU
   // =========================
   if (currentPage === APP_PAGE.MENU) {
     drawMenuPage();
     return;
   }
-
-  // =========================
-  // GAME PLAY
-  // =========================
 
   const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
   background(bg[0], bg[1], bg[2]);
@@ -456,11 +402,10 @@ function draw() {
     viewH,
   });
 
-  // ⚠️ 不再手动 update inputManager
-  // Game 自己会处理 input
-
-  // 正常更新世界
-  game.update();
+  // Only update gameplay while actively playing
+  if (currentPage === APP_PAGE.GAME) {
+    game.update();
+  }
 
   cameraController?.update({
     viewW,
@@ -468,30 +413,51 @@ function draw() {
     levelW: game.level.bounds.levelW,
     levelH: game.level.bounds.levelH,
   });
-
   cameraController?.applyToP5Camera();
 
+  const won = game?.won === true || game?.level?.won === true;
+  const dead = game?.lost === true || game?.level?.player?.dead === true;
+  const elapsedMs = Number(game?.elapsedMs ?? game?.level?.elapsedMs ?? 0);
+
   game.draw({
-    drawHudFn: () => {
-      camera.off();
-      try {
-        drawingContext.imageSmoothingEnabled = false;
-        imageMode(CORNER);
-        image(hudGfx, 0, 0);
-      } finally {
-        camera.on();
-        noTint();
-      }
-    },
+    drawHudFn:
+      won || dead || currentPage === APP_PAGE.PAUSED
+        ? null
+        : () => {
+            camera.off();
+            try {
+              drawingContext.imageSmoothingEnabled = false;
+              imageMode(CORNER);
+              image(hudGfx, 0, 0);
+            } finally {
+              camera.on();
+              noTint();
+            }
+          },
   });
 
   debugMenu?.draw();
 
-  // =========================
-  // PAUSE OVERLAY
-  // =========================
   if (currentPage === APP_PAGE.PAUSED) {
     drawPausePage();
+    return;
+  }
+
+  if (won) {
+    winScreen?.draw({
+      elapsedMs,
+      topScores: game.topScores,
+      awaitingName: game.awaitingName,
+      nameEntry: game.nameEntry,
+      nameCursor: game._nameCursor,
+      blink: game._blink,
+      lastRank: game.lastRank,
+      winScreenState: game.winScreenState,
+    });
+  }
+
+  if (dead) {
+    loseScreen?.draw({ elapsedMs, game });
   }
 }
 
@@ -506,55 +472,46 @@ function mousePressed() {
 function keyPressed(evt) {
   unlockAudioOnce();
 
-  const k = evt.key?.toLowerCase();
+  const k = (evt?.key ?? "").toLowerCase();
 
-  // =================
+  // Debug menu
+  if (evt && (evt.key === "`" || evt.key === "Dead")) {
+    debugMenu.toggle();
+    return false;
+  }
+
   // MENU
-  // =================
-
   if (currentPage === APP_PAGE.MENU) {
     if (k === "enter") {
       currentPage = APP_PAGE.GAME;
       game.restart();
       return false;
     }
+    return preventKeysThatScroll(evt);
   }
 
-  // =================
   // GAME
-  // =================
-
   if (currentPage === APP_PAGE.GAME) {
     if (k === "p") {
       currentPage = APP_PAGE.PAUSED;
       return false;
     }
-
     if (k === "escape") {
       currentPage = APP_PAGE.MENU;
       return false;
     }
   }
 
-  // =================
-  // PAUSE
-  // =================
-
+  // PAUSED
   if (currentPage === APP_PAGE.PAUSED) {
     if (k === "p") {
       currentPage = APP_PAGE.GAME;
       return false;
     }
-
     if (k === "escape") {
       currentPage = APP_PAGE.MENU;
       return false;
     }
-  }
-
-  // debug menu
-  if (evt && (evt.key === "`" || evt.key === "Dead")) {
-    debugMenu.toggle();
     return false;
   }
 
