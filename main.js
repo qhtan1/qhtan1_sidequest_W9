@@ -143,8 +143,16 @@ let gameState = "menu";
 let gamePaused = false;
 
 // Track whether game.build() has been called at least once
-// (so we don't call it again when returning to menu and re-entering)
+// (ESC resets this to false so re-entering always gets a fresh world)
 let gameBuilt = false;
+
+// Brief on-screen notification (e.g. "SAVED!" / "LOADED: ...")
+let _notifText  = "";
+let _notifFrames = 0;
+function _showNotif(text, frames = 120) {
+  _notifText  = text;
+  _notifFrames = frames;
+}
 
 // Make URLs absolute so they can’t accidentally resolve relative to /src/...
 const LEVELS_URL = new URL("./data/levels.json", window.location.href).href;
@@ -360,14 +368,11 @@ function draw() {
     if (inputManager) {
       inputManager.update();
       if (inputManager.input.enterPressed) {
+        // Always build if not yet built (ESC resets gameBuilt → false,
+        // so re-entering always gets a fresh world with no stale sprites)
         if (!gameBuilt) {
-          // First time: build the world (creates all sprites)
           game.build();
           gameBuilt = true;
-        } else {
-          // Returning from in-game: un-hide sprites and reset game
-          for (const s of allSprites) s.visible = true;
-          game.restart();
         }
         cameraController.setTarget(game.level.playerCtrl.sprite);
         cameraController.reset();
@@ -449,6 +454,26 @@ function draw() {
     });
   }
   if (dead) loseScreen?.draw({ elapsedMs, game });
+
+  // Brief save/load notification bar (fades out over last 30 frames)
+  if (_notifFrames > 0) {
+    _notifFrames--;
+    const alpha = _notifFrames > 30 ? 255 : Math.floor((_notifFrames / 30) * 255);
+    camera.off();
+    push();
+    noStroke();
+    const msgW = _notifText.length * 7 + 14;
+    const nx = Math.round((viewW - msgW) / 2);
+    fill(0, 0, 0, alpha * 0.75);
+    rect(nx, viewH - 26, msgW, 14, 3);
+    textSize(9);
+    textAlign(CENTER, CENTER);
+    fill(0, 255, 130, alpha);
+    text(_notifText, viewW / 2, viewH - 19);
+    pop();
+    camera.on();
+    noTint();
+  }
 }
 
 // ------------------------------------------------------------
@@ -468,12 +493,37 @@ function keyPressed(evt) {
     return false;
   }
 
-  // ESC → return to menu (resets the run)
+  // ESC → return to menu
   if (evt && evt.key === "Escape" && gameState === "playing") {
-    for (const s of allSprites) s.visible = false;
-    game.restart();
+    allSprites.remove(); // destroy all p5play sprites so none bleed into menu
+    gameBuilt = false;   // force a fresh game.build() on next Enter
     gamePaused = false;
     gameState = "menu";
+    return false;
+  }
+
+  // S → manual save current run state
+  if ((evt?.key === "s" || evt?.key === "S") && gameState === "playing" && !game.won && !game.lost) {
+    const lvl = game.level;
+    saveManager.save({
+      leavesRescued: lvl?.score     ?? 0,
+      totalLeaves:   lvl?.WIN_SCORE ?? 0,
+      elapsedMs:     game.elapsedMs ?? 0,
+    });
+    _showNotif("SAVED!");
+    return false;
+  }
+
+  // L → load last save (display the saved data; restart is manual)
+  if ((evt?.key === "l" || evt?.key === "L") && gameState === "playing") {
+    const sv = saveManager?.load();
+    if (sv) {
+      const mins = String(Math.floor(sv.elapsedMs / 60000)).padStart(2, "0");
+      const secs = String(Math.floor((sv.elapsedMs % 60000) / 1000)).padStart(2, "0");
+      _showNotif(`LOADED: ${sv.leavesRescued}/${sv.totalLeaves}  ${mins}:${secs}`, 180);
+    } else {
+      _showNotif("NO SAVE FOUND");
+    }
     return false;
   }
 
