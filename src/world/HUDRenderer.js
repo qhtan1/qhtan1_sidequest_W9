@@ -119,11 +119,12 @@ export function redrawHUD(level) {
     drawOutlined(heartChar, x, heartY, col);
   }
 
-  // Timer (top-center, mm:ss format)
+  // Timer (bottom-right corner, mm:ss format)
   const totalSec = Math.floor((level.elapsedMs ?? 0) / 1000);
   const mins = Math.floor(totalSec / 60);
   const secs = totalSec % 60;
   const timerStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  const timerX = Math.round((g.width - timerStr.length * GLYPH_W) / 2);
-  drawOutlined(timerStr, timerX, 6, "#e0e0ff");
+  const timerX = Math.round(g.width - timerStr.length * GLYPH_W - 6);
+  const timerY = Math.round(g.height - GLYPH_W - 6);
+  drawOutlined(timerStr, timerX, timerY, "#e0e0ff");
 }
