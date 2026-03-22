@@ -389,6 +389,8 @@ function draw() {
           game.build();
           gameBuilt = true;
         }
+        // Re-assert manual stepping in case allSprites.remove() reset the world
+        world.autoStep = false;
         cameraController.setTarget(game.level.playerCtrl.sprite);
         cameraController.reset();
         gamePaused = false;
@@ -408,17 +410,17 @@ function draw() {
   });
 
   // Pause game update if paused, loading, or debug menu is open
-  const isPaused = gamePaused || gameLoading || !!window.gamePaused;
-  if (!isPaused) {
+  const isPaused  = gamePaused || !!window.gamePaused; // true pause (P key / debug)
+  const isLoading = gameLoading;                        // load-screen overlay
+  if (!isPaused && !isLoading) {
     game.update();
   } else {
-    // Freeze all sprite animations and physics while paused/loading
     for (const s of allSprites) {
-      if (s.ani) s.ani.playing = false;
-      if (s.vel) {
-        s.vel.x = 0;
-        s.vel.y = 0;
-      }
+      // Always zero velocities so sprites don't drift while frozen
+      if (s.vel) { s.vel.x = 0; s.vel.y = 0; }
+      // Only freeze animations on a real P-key pause, NOT the load overlay.
+      // This way animations are still running when load confirms, so no re-enable needed.
+      if (isPaused && s.ani) s.ani.playing = false;
     }
   }
 
@@ -516,12 +518,8 @@ function keyPressed(evt) {
   // ESC → if load screen is open, close it; otherwise return to menu
   if (evt && evt.key === "Escape" && gameState === "playing") {
     if (gameLoading) {
-      // Close the load screen and resume game
+      // Close the load screen and resume game (animations were never frozen)
       gameLoading = false;
-      // Re-enable sprite animations that were frozen
-      for (const s of allSprites) {
-        if (s.ani) s.ani.playing = true;
-      }
       return false;
     }
     allSprites.remove(); // destroy all p5play sprites so none bleed into menu
@@ -536,12 +534,9 @@ function keyPressed(evt) {
   if (evt && evt.key === "Enter" && gameLoading && gameState === "playing") {
     const sv = saveManager?.load();
     if (sv) {
-      game.restart();                           // reset level, player, timer
+      game.restart();           // resets level, player, boars, timer to 0
+      world.autoStep = false;   // re-assert: allSprites changes can reset this
       game.level.elapsedMs = sv.elapsedMs ?? 0; // restore saved timer
-      // Re-enable animations (restart may have left them frozen)
-      for (const s of allSprites) {
-        if (s.ani) s.ani.playing = true;
-      }
       _showNotif(`LOADED: ${sv.leavesRescued}/${sv.totalLeaves}  ${_fmtMs(sv.elapsedMs)}`);
     }
     gameLoading = false;
@@ -572,10 +567,10 @@ function keyPressed(evt) {
   if (evt && evt.key === "p" || evt?.key === "P") {
     if (gameState === "playing" && game && !game.won && !game.lost) {
       gamePaused = !gamePaused;
-      // Re-enable sprite animations when resuming
+      // Re-enable sprite animations when resuming from pause
       if (!gamePaused) {
         for (const s of allSprites) {
-          if (s.ani) s.ani.playing = true;
+          if (s.ani) { s.ani.playing = true; s.ani.play?.(); }
         }
       }
       return false;
