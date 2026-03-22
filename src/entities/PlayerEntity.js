@@ -161,7 +161,9 @@ export class PlayerEntity {
     this.pendingDeath = false;
     this.deathAnimStarted = false;
 
-    this.invulnTimer = 0;
+    // Give the player a brief invulnerability window on respawn so they don't
+    // instantly take damage from a boar or fire that spawned near the start point.
+    this.invulnTimer = 90; // 1.5 s at 60 fps
     this.knockTimer = 0;
 
     this.attacking = false;

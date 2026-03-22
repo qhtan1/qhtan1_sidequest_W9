@@ -536,7 +536,22 @@ function keyPressed(evt) {
     if (sv) {
       game.restart();           // resets level, player, boars, timer to 0
       world.autoStep = false;   // re-assert: allSprites changes can reset this
-      game.level.elapsedMs = sv.elapsedMs ?? 0; // restore saved timer
+
+      // Restore timer to saved value
+      game.level.elapsedMs = sv.elapsedMs ?? 0;
+
+      // Restore leaf collection state: mark the first N leaves as already collected
+      // so HUD and remaining pickups match what was saved.
+      const toRestore = Math.min(sv.leavesRescued ?? 0, game.level.leafSpawns?.length ?? 0);
+      if (toRestore > 0 && game.level.leafSpawns) {
+        for (let i = 0; i < toRestore; i++) {
+          const item = game.level.leafSpawns[i];
+          if (item?.s) { item.s.active = false; item.s.visible = false; }
+        }
+        game.level.score = toRestore;
+        game.level._lastScore = null; // force HUD redraw on next update
+      }
+
       _showNotif(`LOADED: ${sv.leavesRescued}/${sv.totalLeaves}  ${_fmtMs(sv.elapsedMs)}`);
     }
     gameLoading = false;
