@@ -37,7 +37,7 @@ export class PauseScreen {
     pop();
 
     // Panel
-    const panelW = 120;
+    const panelW = 200;
     const panelH = 50;
     const panelX = Math.round((viewW - panelW) / 2);
     const panelY = Math.round((viewH - panelH) / 2);
