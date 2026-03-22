@@ -16,6 +16,16 @@
 // - Level owns the boar Group and calls these helpers.
 // - BoarSystem is stateless except for stuck-turn tracking on each boar.
 
+// --- Anis clone helper ---
+// p5play's addAnis() mutates the input definition objects (adds internal fields),
+// so passing shared assets.boarAnis directly breaks animations on the second
+// call after allSprites.remove() + rebuild. Shallow-clone each entry first.
+function cloneAnis(defs) {
+  const out = {};
+  for (const [k, v] of Object.entries(defs)) out[k] = { ...v };
+  return out;
+}
+
 // --- GROUP CREATION ---
 // Called by TileBuilder before Tiles() runs so 'b' spawns into this group
 export function buildBoarGroup(level) {
@@ -42,7 +52,7 @@ export function buildBoarGroup(level) {
     safeConfigureAniSheet(level.boar, frameW, frameH, -8);
 
     try {
-      level.boar.addAnis(level.assets.boarAnis);
+      level.boar.addAnis(cloneAnis(level.assets.boarAnis));
     } catch (err) {
       console.warn(
         "[BoarSystem] group.addAnis failed; boars may be static:",
@@ -74,7 +84,7 @@ function ensureBoarAnis(level, e) {
   safeConfigureAniSheet(e, frameW, frameH, -8);
 
   try {
-    e.addAnis(defs);
+    e.addAnis(cloneAnis(defs));
   } catch (err) {
     // If addAnis fails, fall back to static image so the game doesn't crash.
     console.warn("[BoarSystem] sprite.addAnis failed; using static img:", err);
@@ -216,7 +226,7 @@ export function rebuildBoarsFromSpawns(level) {
       safeAssignSpriteSheet(e, level.assets.boarImg);
       safeConfigureAniSheet(e, frameW, frameH, -8);
       try {
-        e.addAnis(level.assets.boarAnis);
+        e.addAnis(cloneAnis(level.assets.boarAnis));
       } catch (err) {
         e.img = level.assets.boarImg;
       }
@@ -321,7 +331,7 @@ export function updateBoars(level) {
         // add defs (safe)
         try {
           // only attempt if missing something obvious
-          if (!e.anis || !e.anis.run) e.addAnis(level.assets.boarAnis);
+          if (!e.anis || !e.anis.run) e.addAnis(cloneAnis(level.assets.boarAnis));
         } catch (err) {
           // ignore; ensureBoarAnis will also try
         }

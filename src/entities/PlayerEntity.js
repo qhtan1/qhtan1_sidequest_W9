@@ -121,7 +121,13 @@ export class PlayerEntity {
       this.sprite.anis.w = frameW;
       this.sprite.anis.h = frameH;
       this.sprite.anis.offset.y = this.ANI_OFFSET_Y;
-      this.sprite.addAnis(anis);
+      // Clone each definition before passing to addAnis().
+      // p5play's addAnis() mutates the input objects (adds internal fields),
+      // so passing the shared assets.playerAnis directly causes animations
+      // to break if game.build() is called a second time after allSprites.remove().
+      const anisClone = {};
+      for (const [k, v] of Object.entries(anis)) anisClone[k] = { ...v };
+      this.sprite.addAnis(anisClone);
       this._setAni("idle");
     } else {
       this.sprite.img = img;
