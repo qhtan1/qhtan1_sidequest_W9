@@ -62,6 +62,7 @@ import { DebugMenu } from "./src/ui/DebugMenu.js";
 ----------------------------------------------------------- */
 
 import { HighScoreManager } from "./src/HighScoreManager.js";
+import { SaveManager } from "./src/SaveManager.js";
 
 // ------------------------------------------------------------
 // Helpers
@@ -125,6 +126,7 @@ let debugMenu;
 ----------------------------------------------------------- */
 
 let highScoreManager;
+let saveManager;
 let seedHighScores;
 
 let winScreen;
@@ -268,6 +270,22 @@ function initRuntime() {
     highScores: highScoreManager,
   });
 
+  // Save/load system (single slot, localStorage)
+  saveManager = new SaveManager();
+
+  // Auto-save when the player wins a run
+  game.events.on("level:won", () => {
+    // Small delay so game state (elapsedMs, level) is fully latched
+    setTimeout(() => {
+      const lvl = game.level;
+      saveManager.save({
+        leavesRescued: lvl?.rescued  ?? 0,
+        totalLeaves:   lvl?.total    ?? 0,
+        elapsedMs:     game.elapsedMs ?? 0,
+      });
+    }, 100);
+  });
+
   // NOTE: game.build() is intentionally deferred until the player presses
   // Enter on the menu screen. Building the world creates p5play sprites
   // which auto-render every frame — calling build() here would make boars,
@@ -329,7 +347,10 @@ function draw() {
 
   // ---- MENU PAGE ----
   if (gameState === "menu") {
-    menuScreen?.draw({ topScores: highScoreManager?.getTop(START_LEVEL_ID) ?? [] });
+    menuScreen?.draw({
+      topScores: highScoreManager?.getTop(START_LEVEL_ID) ?? [],
+      savedGame: saveManager?.load() ?? null,
+    });
 
     // Enter key → build world and start the game
     if (inputManager) {

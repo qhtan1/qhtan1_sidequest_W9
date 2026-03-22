@@ -21,7 +21,7 @@ export class MenuScreen {
     this._blink = 0;
   }
 
-  draw({ topScores = [] } = {}) {
+  draw({ topScores = [], savedGame = null } = {}) {
     const viewW = this.pkg.view?.viewW ?? this.pkg.view?.w ?? 240;
     const viewH = this.pkg.view?.viewH ?? this.pkg.view?.h ?? 192;
 
@@ -107,11 +107,25 @@ export class MenuScreen {
       }
     }
 
+    // ---- Last save slot ----
+    if (savedGame) {
+      const saveLabel = "LAST SAVE:";
+      const txSave = Math.round((viewW - saveLabel.length * this.GLYPH_W) / 2);
+      this._drawOutlined(saveLabel, txSave, viewH - 40, "#ff9900");
+
+      const rescued = savedGame.leavesRescued ?? 0;
+      const total   = savedGame.totalLeaves   ?? 0;
+      const timeStr = _formatMs(savedGame.elapsedMs ?? 0);
+      const saveInfo = `${rescued}/${total} leaves  ${timeStr}`;
+      const txInfo = Math.round((viewW - saveInfo.length * this.GLYPH_W) / 2);
+      this._drawOutlined(saveInfo, txInfo, viewH - 28, "#ffcc66");
+    }
+
     // "Press ENTER" blink
     if (this._blink < 40) {
-      const prompt = "Press ENTER to start";
+      const prompt = savedGame ? "ENTER: new game" : "Press ENTER to start";
       const txPrompt = Math.round((viewW - prompt.length * this.GLYPH_W) / 2);
-      this._drawOutlined(prompt, txPrompt, viewH - 18, "#00ff7a");
+      this._drawOutlined(prompt, txPrompt, viewH - 16, "#00ff7a");
     }
 
     camera.on();
