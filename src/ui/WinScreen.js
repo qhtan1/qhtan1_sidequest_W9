@@ -37,12 +37,6 @@ export class WinScreen {
   draw({
     elapsedMs,
     topScores = [],
-    awaitingName = false,
-    nameEntry = "AAA",
-    nameCursor = 0,
-    blink = 0,
-    lastRank = null,
-    winScreenState = "default",
   } = {}) {
     const viewW = this.pkg.view?.viewW ?? this.pkg.view?.w ?? 240;
     const viewH = this.pkg.view?.viewH ?? this.pkg.view?.h ?? 192;
@@ -55,92 +49,38 @@ export class WinScreen {
     rect(0, 0, viewW, viewH);
     pop();
 
-    if (winScreenState === "default") {
-      const msg1 = "YOU WIN!";
-      const msg2 = `TIME: ${formatTimeMs(elapsedMs ?? 0)}`;
-      const x1 = Math.round((viewW - msg1.length * this.GLYPH_W) / 2);
-      const x2 = Math.round((viewW - msg2.length * this.GLYPH_W) / 2);
-      let y = Math.round(viewH / 2 - 44);
-      this._drawOutlined(window, msg1, x1, y, "#00e5ff");
-      y += 28;
-      this._drawOutlined(window, msg2, x2, y, "#ffdc00");
-      y += 28;
-      let prompt1, prompt2;
-      if (lastRank !== null) {
-        prompt1 = "Press E to enter initials";
-      } else {
-        prompt1 = "Press V to view high scores";
-      }
-      prompt2 = "Press R to restart";
-      const xP1 = Math.round((viewW - prompt1.length * this.GLYPH_W) / 2);
-      const xP2 = Math.round((viewW - prompt2.length * this.GLYPH_W) / 2);
-      this._drawOutlined(window, prompt1, xP1, y, "#ffffff");
-      y += 22;
-      this._drawOutlined(window, prompt2, xP2, y, "#ffffff");
-    } else if (winScreenState === "enter-initials") {
-      let y = 10;
-      const header = "HIGH SCORES:";
+    // ---- YOU WIN heading ----
+    const msg1 = "YOU WIN!";
+    const msg2 = `TIME: ${formatTimeMs(elapsedMs ?? 0)}`;
+    const x1 = Math.round((viewW - msg1.length * this.GLYPH_W) / 2);
+    const x2 = Math.round((viewW - msg2.length * this.GLYPH_W) / 2);
+    let y = Math.round(viewH / 2 - 60);
+    this._drawOutlined(window, msg1, x1, y, "#00e5ff");
+    y += 24;
+    this._drawOutlined(window, msg2, x2, y, "#ffdc00");
+    y += 22;
+
+    // ---- Best times ----
+    if (topScores.length > 0) {
+      const header = "BEST TIMES";
       const xH = Math.round((viewW - header.length * this.GLYPH_W) / 2);
       this._drawOutlined(window, header, xH, y, "#ffffff");
-      y += 24;
-      const col1 = Math.round(viewW / 2 - 70);
-      const col2 = Math.round(viewW / 2 + 30);
-      this._drawOutlined(window, "Initial", col1, y, "#bbbbbb");
-      this._drawOutlined(window, "Time", col2, y, "#bbbbbb");
-      y += 20;
-      for (let i = 0; i < 5; i++) {
+      y += 18;
+      for (let i = 0; i < Math.min(3, topScores.length); i++) {
         const entry = topScores[i] || { name: "---", ms: 0 };
-        let nameStr = entry.name;
-        let color = "#ffffff";
-        if (lastRank === i) color = "#00ff7a";
-        if (awaitingName && lastRank === i) {
-          // Draw each character individually: current cursor char is bright, rest are dimmer
-          const rowColor = "#00ff7a";
-          const cursorColor = "#ffdc00";
-          for (let j = 0; j < 3; j++) {
-            const ch = nameEntry[j] || "_";
-            const cx = Math.round(col1 + j * this.GLYPH_W);
-            this._drawOutlined(
-              window,
-              ch,
-              cx,
-              y,
-              j === nameCursor ? cursorColor : rowColor,
-            );
-          }
-        } else {
-          this._drawOutlined(window, nameStr, col1, y, color);
-        }
-        let timeStr = entry.ms ? formatTimeMs(entry.ms) : "--:--.--";
-        this._drawOutlined(window, timeStr, col2, y, color);
-        y += 18;
+        const timeStr = entry.ms ? formatTimeMs(entry.ms) : "--:--.--";
+        const row = `${i + 1}. ${timeStr}`;
+        const xRow = Math.round((viewW - row.length * this.GLYPH_W) / 2);
+        this._drawOutlined(window, row, xRow, y, i === 0 ? "#ffdc00" : "#cccccc");
+        y += 16;
       }
       y += 8;
-      const prompt = "Type initials, ENTER to save";
-      const xP = Math.round((viewW - prompt.length * this.GLYPH_W) / 2);
-      this._drawOutlined(window, prompt, xP, y, "#ffffff");
-    } else if (winScreenState === "show-highscores") {
-      let y = 10;
-      const header = "HIGH SCORES";
-      const xH = Math.round((viewW - header.length * this.GLYPH_W) / 2);
-      this._drawOutlined(window, header, xH, y, "#ffffff");
-      y += 24;
-      const col1 = Math.round(viewW / 2 - 70);
-      const col2 = Math.round(viewW / 2 + 30);
-      for (let i = 0; i < 5; i++) {
-        const entry = topScores[i] || { name: "---", ms: 0 };
-        let nameStr = entry.name;
-        let color = lastRank === i ? "#00ff7a" : "#ffffff";
-        let timeStr = entry.ms ? formatTimeMs(entry.ms) : "--:--.--";
-        this._drawOutlined(window, nameStr, col1, y, color);
-        this._drawOutlined(window, timeStr, col2, y, color);
-        y += 18;
-      }
-      y += 8;
-      const prompt = "Press R to restart";
-      const xP = Math.round((viewW - prompt.length * this.GLYPH_W) / 2);
-      this._drawOutlined(window, prompt, xP, y, "#ffffff");
     }
+
+    // ---- Restart prompt ----
+    const prompt = "Press R to restart";
+    const xP = Math.round((viewW - prompt.length * this.GLYPH_W) / 2);
+    this._drawOutlined(window, prompt, xP, y, "#aaaaaa");
 
     camera.on();
     noTint();

@@ -236,54 +236,20 @@ export class Game {
     this.won = levelWon || this.won === true;
 
     // -----------------------
-    // Win screen state transitions (E / V / Enter)
+    // Win screen state transitions (initials entry disabled)
     // -----------------------
-    const wasAwaitingName = this.awaitingName;
+    // NOTE: The enter-initials / show-highscores states are disabled.
+    // The WinScreen now shows a simplified overlay (YOU WIN + time + best
+    // times + R to restart). The name-entry UI was removed because it
+    // caused physics bugs (boars falling/clustering) when the enter-initials
+    // state froze sprite updates mid-frame.
+    //
+    // const wasAwaitingName = this.awaitingName;
+    // if (this.won && !this.awaitingName) { ... E/V key handlers ... }
+    // if (wasAwaitingName) { ... typing controls ... }
 
-    if (this.won && !this.awaitingName) {
-      if (this.winScreenState === "default") {
-        if (inputSnap?.ePressed && this.lastRank !== null) {
-          this.winScreenState = "enter-initials";
-          this.awaitingName = true;
-          this.nameEntry = "___";
-          this._nameCursor = 0;
-          this._blink = 0;
-        } else if (inputSnap?.vPressed && this.lastRank === null) {
-          this.winScreenState = "show-highscores";
-        }
-      }
-    }
-
-    // -----------------------
-    // Name-entry controls (keyboard typing)
-    // -----------------------
-    if (wasAwaitingName) {
-      this._blink = (this._blink + 1) % 60;
-
-      if (inputSnap?.typedChar) {
-        this.nameEntry =
-          this.nameEntry.substring(0, this._nameCursor) +
-          inputSnap.typedChar +
-          this.nameEntry.substring(this._nameCursor + 1);
-        this._nameCursor = (this._nameCursor + 1) % 3;
-      }
-
-      if (inputSnap?.backspacePressed) {
-        this._nameCursor = (this._nameCursor - 1 + 3) % 3;
-        this.nameEntry =
-          this.nameEntry.substring(0, this._nameCursor) +
-          "_" +
-          this.nameEntry.substring(this._nameCursor + 1);
-      }
-
-      if (inputSnap?.enterPressed) {
-        this._commitNameEntry();
-        this.winScreenState = "show-highscores";
-      }
-    }
-
-    // Restart only allowed from terminal states, not during name entry
-    if (inputSnap?.restartPressed && (this.won || dead) && !this.awaitingName) {
+    // Restart allowed from any terminal state
+    if (inputSnap?.restartPressed && (this.won || dead)) {
       this.restart();
     }
   }

@@ -263,20 +263,22 @@ function initRuntime() {
     highScores: highScoreManager,
   });
 
-  game.build();
+  // NOTE: game.build() is intentionally deferred until the player presses
+  // Enter on the menu screen. Building the world creates p5play sprites
+  // which auto-render every frame — calling build() here would make boars,
+  // leaves, fire, etc. bleed through the menu panel.
 
   // UI overlays
   winScreen = new WinScreen(levelPkg, assets);
   loseScreen = new LoseScreen(levelPkg, assets);
   menuScreen = new MenuScreen(levelPkg, assets);
 
-  // VIEW: camera follow + clamp
+  // VIEW: camera follow + clamp (target set after build())
   cameraController = new CameraController(levelPkg);
-  cameraController.setTarget(game.level.playerCtrl.sprite);
-  cameraController.reset();
 
   // IMPORTANT: subscribe ONCE (not in draw)
   game.events.on("level:restarted", () => {
+    cameraController?.setTarget(game.level?.playerCtrl?.sprite);
     cameraController?.reset();
   });
 
@@ -323,12 +325,14 @@ function draw() {
   if (gameState === "menu") {
     menuScreen?.draw({ topScores: highScoreManager?.getTop(START_LEVEL_ID) ?? [] });
 
-    // Enter key → start the game
+    // Enter key → build world and start the game
     if (inputManager) {
       inputManager.update();
       if (inputManager.input.enterPressed) {
+        game.build(); // create all sprites NOW (not during menu)
+        cameraController.setTarget(game.level.playerCtrl.sprite);
+        cameraController.reset();
         gameState = "playing";
-        game.restart(); // reset world cleanly before first play
       }
     }
     return; // skip world update + draw while on menu
@@ -396,12 +400,6 @@ function draw() {
     winScreen?.draw({
       elapsedMs,
       topScores: game.topScores,
-      awaitingName: game.awaitingName,
-      nameEntry: game.nameEntry,
-      nameCursor: game._nameCursor,
-      blink: game._blink,
-      lastRank: game.lastRank,
-      winScreenState: game.winScreenState,
     });
   }
   if (dead) loseScreen?.draw({ elapsedMs, game });
