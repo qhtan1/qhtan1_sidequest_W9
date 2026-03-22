@@ -417,6 +417,13 @@ function mousePressed() {
 
 function keyPressed(evt) {
   unlockAudioOnce();
+
+  // Cheat: press \ to instantly win (for testing win screen)
+  if (evt && evt.key === "\\" && gameState === "playing" && game && !game.won && !game.lost) {
+    game.events?.emit("level:won");
+    return false;
+  }
+
   // Debug menu: toggle with backtick (`) key
   if (evt && (evt.key === "`" || evt.key === "Dead")) {
     debugMenu.toggle();

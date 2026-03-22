@@ -1,26 +1,16 @@
 // src/ui/MenuScreen.js
 // Title / main menu screen (VIEW layer).
-//
-// Responsibilities:
-// - Draw the game title and start prompt before gameplay begins
-// - Show top high scores so returning players have context
-// - Signal to main.js when the player wants to start (via .wantsStart flag)
-//
-// Non-goals:
-// - Does NOT start the game itself (main.js state machine does)
-// - Does NOT modify world state
-// - Does NOT poll kb directly (main.js reads InputManager and sets wantsStart)
 
 export class MenuScreen {
   constructor(pkg, assets) {
     this.pkg = pkg;
     this.assets = assets;
 
-    // Font config — same setup as HUDRenderer / WinScreen
-    this.FONT_COLS = pkg.tuning?.hud?.font?.cols ?? 19;
-    this.CELL     = pkg.tuning?.hud?.font?.cell ?? 30;
+    // Font config — same as HUDRenderer / WinScreen
+    this.FONT_COLS  = pkg.tuning?.hud?.font?.cols  ?? 19;
+    this.CELL       = pkg.tuning?.hud?.font?.cell  ?? 30;
     this.FONT_SCALE = pkg.tuning?.hud?.font?.scale ?? 1 / 3;
-    this.GLYPH_W  = this.CELL * this.FONT_SCALE; // ~10 px
+    this.GLYPH_W    = this.CELL * this.FONT_SCALE; // ~10 px
 
     this.FONT_CHARS =
       pkg.tuning?.hud?.fontChars ??
@@ -28,14 +18,9 @@ export class MenuScreen {
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`" +
         "abcdefghijklmnopqrstuvwxyz{|}~";
 
-    // Blink counter for the "Press ENTER" prompt
     this._blink = 0;
   }
 
-  /**
-   * Draw the menu screen. Call every frame while gameState === "menu".
-   * @param {{ topScores: {name,ms}[] }} opts
-   */
   draw({ topScores = [] } = {}) {
     const viewW = this.pkg.view?.viewW ?? this.pkg.view?.w ?? 240;
     const viewH = this.pkg.view?.viewH ?? this.pkg.view?.h ?? 192;
@@ -44,16 +29,51 @@ export class MenuScreen {
 
     camera.off();
     drawingContext.imageSmoothingEnabled = false;
-
-    // Background
     push();
+    imageMode(CORNER);
+
+    // ---- Layer 1: forest background (furthest parallax layer) ----
+    const bgImg = this.assets?.backgrounds?.bgFar;
+    if (bgImg) {
+      // stretch to fill canvas
+      image(bgImg, 0, 0, viewW, viewH);
+    } else {
+      // fallback solid colour
+      noStroke();
+      fill(20, 16, 30);
+      rect(0, 0, viewW, viewH);
+    }
+
+    // ---- Layer 2: soft semi-transparent panel ----
+    // Panel sits in the centre, leaving a gap on each side
+    const panelX = 16;
+    const panelY = 20;
+    const panelW = viewW - 32;
+    const panelH = viewH - 36;
+
+    // Outer glow: four progressively smaller, more opaque rects
     noStroke();
-    fill(20, 16, 30);
-    rect(0, 0, viewW, viewH);
+    for (let i = 4; i >= 0; i--) {
+      fill(8, 5, 18, 30 + i * 20);
+      rect(panelX - i * 3, panelY - i * 3, panelW + i * 6, panelH + i * 6, 6 + i * 2);
+    }
+    // Solid panel core
+    fill(8, 5, 18, 195);
+    rect(panelX, panelY, panelW, panelH, 6);
+
+    // Thin border
+    stroke(80, 140, 200, 120);
+    strokeWeight(1);
+    noFill();
+    rect(panelX + 1, panelY + 1, panelW - 2, panelH - 2, 5);
+    noStroke();
+
     pop();
 
+    // ---- Layer 3: text ----
+
     // Title
-    const title = "FOX FOREST";
+    const title = "FOREST RESCUE";
     const txTitle = Math.round((viewW - title.length * this.GLYPH_W) / 2);
     this._drawOutlined(title, txTitle, 30, "#00e5ff");
 
@@ -62,39 +82,43 @@ export class MenuScreen {
     const txSub = Math.round((viewW - sub.length * this.GLYPH_W) / 2);
     this._drawOutlined(sub, txSub, 48, "#aaaaaa");
 
-    // Controls hint
-    const ctrl = "Arrow keys to move  Z to attack";
-    const txCtrl = Math.round((viewW - ctrl.length * this.GLYPH_W) / 2);
-    this._drawOutlined(ctrl, txCtrl, 74, "#888888");
+    // Divider hint
+    this._drawOutlined("- - - - - - - - - - -", Math.round((viewW - 21 * this.GLYPH_W) / 2), 62, "#334455");
 
-    // High scores (top 3)
+    // Controls
+    const ctrl1 = "Arrows  move    Z  attack";
+    const ctrl2 = "Collect leaves to rescue friends";
+    const txC1 = Math.round((viewW - ctrl1.length * this.GLYPH_W) / 2);
+    const txC2 = Math.round((viewW - ctrl2.length * this.GLYPH_W) / 2);
+    this._drawOutlined(ctrl1, txC1, 74, "#88aacc");
+    this._drawOutlined(ctrl2, txC2, 86, "#88aacc");
+
+    // Best times
     if (topScores.length > 0) {
       const hsLabel = "BEST TIMES";
       const txHs = Math.round((viewW - hsLabel.length * this.GLYPH_W) / 2);
-      this._drawOutlined(hsLabel, txHs, 100, "#ffdc00");
+      this._drawOutlined(hsLabel, txHs, 104, "#ffdc00");
 
       for (let i = 0; i < Math.min(3, topScores.length); i++) {
         const e = topScores[i];
-        const row = `${i + 1}. ${e.name ?? "---"}  ${_formatMs(e.ms ?? 0)}`;
+        const row = `${i + 1}. ${(e.name ?? "---").padEnd(3)}  ${_formatMs(e.ms ?? 0)}`;
         const txRow = Math.round((viewW - row.length * this.GLYPH_W) / 2);
-        this._drawOutlined(row, txRow, 114 + i * 14, "#ffffff");
+        this._drawOutlined(row, txRow, 116 + i * 14, i === 0 ? "#ffdc00" : "#ffffff");
       }
     }
 
-    // "Press ENTER" — blink every 30 frames
+    // "Press ENTER" blink
     if (this._blink < 40) {
       const prompt = "Press ENTER to start";
       const txPrompt = Math.round((viewW - prompt.length * this.GLYPH_W) / 2);
-      this._drawOutlined(prompt, txPrompt, viewH - 24, "#00ff7a");
+      this._drawOutlined(prompt, txPrompt, viewH - 18, "#00ff7a");
     }
 
     camera.on();
     noTint();
   }
 
-  // ---------------------------------------------------------------------------
-  // Internal bitmap font helpers (same pattern as WinScreen / LoseScreen)
-  // ---------------------------------------------------------------------------
+  // ---- bitmap font helpers ----
 
   _drawOutlined(str, x, y, fillHex) {
     tint("#000000");
@@ -102,28 +126,22 @@ export class MenuScreen {
     this._drawBitmap(str, x + 1, y);
     this._drawBitmap(str, x, y - 1);
     this._drawBitmap(str, x, y + 1);
-
     tint(fillHex);
     this._drawBitmap(str, x, y);
-
     noTint();
   }
 
   _drawBitmap(str, x, y) {
     const fontImg = this.assets?.fontImg;
     if (!fontImg) return;
-
     str = String(str);
-    const dw = this.GLYPH_W;
-
     for (let i = 0; i < str.length; i++) {
       const idx = this.FONT_CHARS.indexOf(str[i]);
       if (idx < 0) continue;
       const sx = (idx % this.FONT_COLS) * this.CELL;
       const sy = Math.floor(idx / this.FONT_COLS) * this.CELL;
-      image(
-        fontImg,
-        Math.round(x + i * dw), Math.round(y),
+      image(fontImg,
+        Math.round(x + i * this.GLYPH_W), Math.round(y),
         this.GLYPH_W, this.GLYPH_W,
         sx, sy, this.CELL, this.CELL,
       );
