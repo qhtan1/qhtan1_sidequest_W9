@@ -139,15 +139,6 @@ const START_LEVEL_ID = "ex5_level1";
 // Boot flags
 let bootStarted = false;
 let bootDone = false;
-const APP_PAGE = {
-  MENU: "menu",
-  GAME: "game",
-  PAUSED: "paused",
-  GAMEOVER: "gameover",
-};
-
-let currentPage = APP_PAGE.MENU;
-let gameOverMode = null; // "win" | "lose"
 
 // ------------------------------------------------------------
 // Boot pipeline (async) — runs from setup()
@@ -284,84 +275,8 @@ function initRuntime() {
 
   // VIEW: parallax background renderer
   parallax = new ParallaxBackground(parallaxLayers);
-  currentPage = APP_PAGE.MENU;
-  setAllSpritesVisible(false);
+
   loop();
-}
-
-function drawMenuPage() {
-  const viewW = levelPkg.view.viewW;
-  const viewH = levelPkg.view.viewH;
-
-  // Force a clean screen-space drawing state
-  resetMatrix();
-  if (camera && typeof camera.off === "function") camera.off();
-
-  noTint();
-  imageMode(CORNER);
-  rectMode(CORNER);
-  textAlign(CENTER, CENTER);
-
-  const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
-  background(bg[0], bg[1], bg[2]);
-
-  parallax?.draw({
-    cameraX: 0,
-    viewW,
-    viewH,
-  });
-
-  noStroke();
-  fill(0, 0, 0, 150);
-  rect(0, 0, viewW, viewH);
-
-  const panelX = 28;
-  const panelY = 22;
-  const panelW = viewW - 56;
-  const panelH = viewH - 44;
-
-  fill(10, 10, 16, 230);
-  rect(panelX, panelY, panelW, panelH, 8);
-
-  fill(255);
-  textSize(20);
-  text("FOREST RESCUE", viewW / 2, viewH / 2 - 28);
-
-  textSize(10);
-  text("ENTER - Start", viewW / 2, viewH / 2 + 2);
-  text("P - Pause in game", viewW / 2, viewH / 2 + 18);
-  text("ESC - Return to title", viewW / 2, viewH / 2 + 32);
-}
-
-function drawPausePage() {
-  const viewW = levelPkg.view.viewW;
-  const viewH = levelPkg.view.viewH;
-
-  push();
-  camera.off();
-
-  noStroke();
-  fill(0, 0, 0, 160);
-  rect(0, 0, viewW, viewH);
-
-  fill(255);
-  textAlign(CENTER, CENTER);
-
-  textSize(18);
-  text("PAUSED", viewW / 2, viewH / 2 - 18);
-
-  textSize(10);
-  text("P - Resume", viewW / 2, viewH / 2 + 6);
-  text("ESC - Return to Title", viewW / 2, viewH / 2 + 20);
-
-  camera.on();
-  pop();
-}
-
-function setAllSpritesVisible(isVisible) {
-  for (const s of allSprites) {
-    s.visible = isVisible;
-  }
 }
 
 // ------------------------------------------------------------
@@ -371,7 +286,6 @@ function setAllSpritesVisible(isVisible) {
 function setup() {
   // Create a tiny placeholder canvas immediately so p5 is happy,
   // then pause the loop until our async boot finishes.
-  console.log("BUILD 7 LOADED");
   new Canvas(10, 10, "pixelated");
   pixelDensity(1);
   noLoop();
@@ -391,30 +305,35 @@ function draw() {
   const viewW = levelPkg.view.viewW;
   const viewH = levelPkg.view.viewH;
 
-  // =========================
-  // MENU
-  // =========================
-  if (currentPage === APP_PAGE.MENU) {
-    drawMenuPage();
-    return;
-  }
-
+  // Background colour is per-level in levels.json: level.view.background
   const bg = levelPkg.level?.view?.background ?? [69, 61, 79];
   background(bg[0], bg[1], bg[2]);
 
+  // Collision box debug toggle
   allSprites.debug = !!(window.debugState && window.debugState.collisionBoxes);
 
+  // Parallax uses camera.x from previous frame (fine with manual stepping)
   parallax?.draw({
     cameraX: camera.x || 0,
     viewW,
     viewH,
   });
 
-  // Only update gameplay while actively playing
-  if (currentPage === APP_PAGE.GAME) {
+  // Pause game update if debug menu is open
+  if (!window.gamePaused) {
     game.update();
+  } else {
+    // Freeze all sprite animations and physics
+    for (const s of allSprites) {
+      if (s.ani) s.ani.playing = false;
+      if (s.vel) {
+        s.vel.x = 0;
+        s.vel.y = 0;
+      }
+    }
   }
 
+  // VIEW: camera follow + clamp (after update so player position is current)
   cameraController?.update({
     viewW,
     viewH,
@@ -423,13 +342,15 @@ function draw() {
   });
   cameraController?.applyToP5Camera();
 
+  // Check terminal state for HUD/overlay decisions
   const won = game?.won === true || game?.level?.won === true;
   const dead = game?.lost === true || game?.level?.player?.dead === true;
   const elapsedMs = Number(game?.elapsedMs ?? game?.level?.elapsedMs ?? 0);
 
+  // WORLD draw + HUD composite (hide HUD on win/lose screens)
   game.draw({
     drawHudFn:
-      won || dead || currentPage === APP_PAGE.PAUSED
+      won || dead
         ? null
         : () => {
             camera.off();
@@ -444,12 +365,8 @@ function draw() {
           },
   });
 
+  // Draw debug menu overlay if enabled
   debugMenu?.draw();
-
-  if (currentPage === APP_PAGE.PAUSED) {
-    drawPausePage();
-    return;
-  }
 
   if (won) {
     winScreen?.draw({
@@ -463,10 +380,7 @@ function draw() {
       winScreenState: game.winScreenState,
     });
   }
-
-  if (dead) {
-    loseScreen?.draw({ elapsedMs, game });
-  }
+  if (dead) loseScreen?.draw({ elapsedMs, game });
 }
 
 // ------------------------------------------------------------
@@ -479,63 +393,19 @@ function mousePressed() {
 
 function keyPressed(evt) {
   unlockAudioOnce();
-
-  const k = (evt?.key ?? "").toLowerCase();
-
-  // Debug menu
+  // Debug menu: toggle with backtick (`) key
   if (evt && (evt.key === "`" || evt.key === "Dead")) {
     debugMenu.toggle();
     return false;
   }
-
-  // MENU
-  if (currentPage === APP_PAGE.MENU) {
-    if (k === "enter") {
-      setAllSpritesVisible(true);
-      currentPage = APP_PAGE.GAME;
-      game.restart();
+  // If debug menu is open, only handle debug menu navigation/toggles
+  if (window.gamePaused) {
+    if (debugMenu?.enabled && debugMenu.handleInput(evt)) {
       return false;
     }
-    return preventKeysThatScroll(evt);
-  }
-
-  // GAME
-  if (currentPage === APP_PAGE.GAME) {
-    if (k === "p") {
-      currentPage = APP_PAGE.PAUSED;
-      return false;
-    }
-    if (k === "escape") {
-      setAllSpritesVisible(false);
-
-      if (camera && typeof camera.off === "function") camera.off();
-      resetMatrix();
-      noTint();
-
-      currentPage = APP_PAGE.MENU;
-      return false;
-    }
-  }
-
-  // PAUSED
-  if (currentPage === APP_PAGE.PAUSED) {
-    if (k === "p") {
-      currentPage = APP_PAGE.GAME;
-      return false;
-    }
-    if (k === "escape") {
-      setAllSpritesVisible(false);
-
-      if (camera && typeof camera.off === "function") camera.off();
-      resetMatrix();
-      noTint();
-
-      currentPage = APP_PAGE.MENU;
-      return false;
-    }
+    // Block all other input
     return false;
   }
-
   return preventKeysThatScroll(evt);
 }
 
