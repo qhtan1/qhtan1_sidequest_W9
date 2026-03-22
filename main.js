@@ -139,6 +139,12 @@ const START_LEVEL_ID = "ex5_level1";
 // Boot flags
 let bootStarted = false;
 let bootDone = false;
+const APP_PAGE = {
+  MENU: "menu",
+  GAME: "game",
+};
+
+let currentPage = APP_PAGE.MENU;
 
 // ------------------------------------------------------------
 // Boot pipeline (async) — runs from setup()
@@ -275,8 +281,30 @@ function initRuntime() {
 
   // VIEW: parallax background renderer
   parallax = new ParallaxBackground(parallaxLayers);
-
+  currentPage = APP_PAGE.MENU;
   loop();
+}
+
+function drawMenuPage() {
+  const viewW = levelPkg.view.viewW;
+  const viewH = levelPkg.view.viewH;
+
+  background(20, 20, 28);
+
+  push();
+  fill(0, 0, 0, 200);
+  noStroke();
+  rect(20, 20, viewW - 40, viewH - 40, 8);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+
+  textSize(20);
+  text("FOREST RESCUE", viewW / 2, viewH / 2 - 26);
+
+  textSize(10);
+  text("Press ENTER to Start", viewW / 2, viewH / 2 + 8);
+  pop();
 }
 
 // ------------------------------------------------------------
@@ -301,7 +329,18 @@ function setup() {
 
 function draw() {
   if (!bootDone || !levelPkg || !game) return;
+  inputManager.update();
+  const input = inputManager.input;
 
+  if (currentPage === APP_PAGE.MENU) {
+    if (input.enterPressed) {
+      currentPage = APP_PAGE.GAME;
+      game.restart();
+    }
+
+    drawMenuPage();
+    return;
+  }
   const viewW = levelPkg.view.viewW;
   const viewH = levelPkg.view.viewH;
 
