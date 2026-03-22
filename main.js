@@ -49,6 +49,7 @@ import { DebugOverlay } from "./src/DebugOverlay.js";
 
 import { WinScreen } from "./src/ui/WinScreen.js";
 import { LoseScreen } from "./src/ui/LoseScreen.js";
+import { MenuScreen } from "./src/ui/MenuScreen.js";
 import { DebugMenu } from "./src/ui/DebugMenu.js";
 
 /* -----------------------------------------------------------
@@ -127,7 +128,12 @@ let seedHighScores;
 
 let winScreen;
 let loseScreen;
+let menuScreen;
 let parallaxLayers = []; // Preloaded parallax layer defs [{ img, factor }, ...]
+
+// Page state machine: "menu" | "playing"
+// (win/lose are overlays drawn on top of "playing", not separate states)
+let gameState = "menu";
 
 // Make URLs absolute so they can’t accidentally resolve relative to /src/...
 const LEVELS_URL = new URL("./data/levels.json", window.location.href).href;
@@ -262,6 +268,7 @@ function initRuntime() {
   // UI overlays
   winScreen = new WinScreen(levelPkg, assets);
   loseScreen = new LoseScreen(levelPkg, assets);
+  menuScreen = new MenuScreen(levelPkg, assets);
 
   // VIEW: camera follow + clamp
   cameraController = new CameraController(levelPkg);
@@ -311,6 +318,23 @@ function draw() {
 
   // Collision box debug toggle
   allSprites.debug = !!(window.debugState && window.debugState.collisionBoxes);
+
+  // ---- MENU PAGE ----
+  if (gameState === "menu") {
+    menuScreen?.draw({ topScores: highScoreManager?.getTop(START_LEVEL_ID) ?? [] });
+
+    // Enter key → start the game
+    if (inputManager) {
+      inputManager.update();
+      if (inputManager.input.enterPressed) {
+        gameState = "playing";
+        game.restart(); // reset world cleanly before first play
+      }
+    }
+    return; // skip world update + draw while on menu
+  }
+
+  // ---- PLAYING PAGE ----
 
   // Parallax uses camera.x from previous frame (fine with manual stepping)
   parallax?.draw({
