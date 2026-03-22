@@ -142,6 +142,10 @@ let gameState = "menu";
 // Pause flag (separate from debug menu pause)
 let gamePaused = false;
 
+// Track whether game.build() has been called at least once
+// (so we don't call it again when returning to menu and re-entering)
+let gameBuilt = false;
+
 // Make URLs absolute so they can’t accidentally resolve relative to /src/...
 const LEVELS_URL = new URL("./data/levels.json", window.location.href).href;
 const TUNING_URL = new URL("./data/tuning.json", window.location.href).href;
@@ -279,8 +283,8 @@ function initRuntime() {
     setTimeout(() => {
       const lvl = game.level;
       saveManager.save({
-        leavesRescued: lvl?.rescued  ?? 0,
-        totalLeaves:   lvl?.total    ?? 0,
+        leavesRescued: lvl?.score     ?? 0,   // Level.score = leaves collected
+        totalLeaves:   lvl?.WIN_SCORE ?? 0,   // Level.WIN_SCORE = target count
         elapsedMs:     game.elapsedMs ?? 0,
       });
     }, 100);
@@ -356,9 +360,18 @@ function draw() {
     if (inputManager) {
       inputManager.update();
       if (inputManager.input.enterPressed) {
-        game.build(); // create all sprites NOW (not during menu)
+        if (!gameBuilt) {
+          // First time: build the world (creates all sprites)
+          game.build();
+          gameBuilt = true;
+        } else {
+          // Returning from in-game: un-hide sprites and reset game
+          for (const s of allSprites) s.visible = true;
+          game.restart();
+        }
         cameraController.setTarget(game.level.playerCtrl.sprite);
         cameraController.reset();
+        gamePaused = false;
         gameState = "playing";
       }
     }
@@ -452,6 +465,15 @@ function keyPressed(evt) {
   // Cheat: press \ to instantly win (for testing win screen)
   if (evt && evt.key === "\\" && gameState === "playing" && game && !game.won && !game.lost) {
     game.events?.emit("level:won");
+    return false;
+  }
+
+  // ESC → return to menu (resets the run)
+  if (evt && evt.key === "Escape" && gameState === "playing") {
+    for (const s of allSprites) s.visible = false;
+    game.restart();
+    gamePaused = false;
+    gameState = "menu";
     return false;
   }
 
