@@ -146,15 +146,20 @@ export class PlayerEntity {
     // No GlueJoint needed — position is updated manually each frame.
     this.sensor = null; // legacy reference kept null (isGrounded no longer uses it)
     this.footProbe = new Sprite(-9999, -9999, this.COLLIDER_W, 2);
-    this.footProbe.collider   = "none";
-    this.footProbe.physics    = "dynamic";
-    this.footProbe.gravity    = 0;
-    this.footProbe.mass       = 0.0001;
+    this.footProbe.collider = "none";
+    this.footProbe.physics = "dynamic";
+    this.footProbe.gravity = 0;
+    this.footProbe.mass = 0.0001;
     this.footProbe.rotationLock = true;
-    this.footProbe.friction   = 0;
+    this.footProbe.friction = 0;
     this.footProbe.bounciness = 0;
-    this.footProbe.visible    = false;
 
+    // Keep the ground probe usable for overlap checks, but never visibly rendered
+    this.footProbe.visible = false;
+    this.footProbe.color = "rgba(0,0,0,0)";
+    this.footProbe.stroke = "rgba(0,0,0,0)";
+    this.footProbe.strokeWeight = 0;
+    this.footProbe.layer = -9999;
     return this;
   }
 
@@ -185,6 +190,10 @@ export class PlayerEntity {
     if (this.footProbe) {
       this.footProbe.x = -9999;
       this.footProbe.y = -9999;
+      this.footProbe.visible = false;
+      this.footProbe.color = "rgba(0,0,0,0)";
+      this.footProbe.stroke = "rgba(0,0,0,0)";
+      this.footProbe.strokeWeight = 0;
     }
 
     this._setAni("idle");
@@ -199,10 +208,16 @@ export class PlayerEntity {
     // Update foot probe to sit 1 px below the player's collider feet.
     // Must be done before the overlap checks below.
     if (this.footProbe) {
-      this.footProbe.x   = this.sprite.x;
-      this.footProbe.y   = this.sprite.y + this.COLLIDER_H / 2 + 1;
+      this.footProbe.x = this.sprite.x;
+      this.footProbe.y = this.sprite.y + this.COLLIDER_H / 2 + 1;
       this.footProbe.vel.x = 0;
       this.footProbe.vel.y = 0;
+
+      // Force-hide the probe every frame so it never appears as a purple bar
+      this.footProbe.visible = false;
+      this.footProbe.color = "rgba(0,0,0,0)";
+      this.footProbe.stroke = "rgba(0,0,0,0)";
+      this.footProbe.strokeWeight = 0;
     }
 
     // Primary: p5play v3 contact-based detection (works when available).
