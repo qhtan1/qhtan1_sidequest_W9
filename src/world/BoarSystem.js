@@ -570,8 +570,8 @@ export function updateBoars(level) {
       continue;
     }
 
-    // patrol — reduced motion halves boar speed for accessibility
-    const effectiveSpeed = boarSpeed * (window.settings?.reducedMotion ? 0.5 : 1);
+    // patrol — reduced motion slows boar to 40% speed (user-requested -60% reduction)
+    const effectiveSpeed = boarSpeed * (window.settings?.reducedMotion ? 0.4 : 1);
     e.vel.x = e.dir * effectiveSpeed;
     e.mirror.x = e.dir === -1;
 

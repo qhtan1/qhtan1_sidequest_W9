@@ -86,18 +86,26 @@ export class MenuScreen {
     this._drawOutlined(ctrl1, Math.round((viewW - ctrl1.length * this.GLYPH_W) / 2), 76, "#88aacc");
     this._drawOutlined(ctrl2, Math.round((viewW - ctrl2.length * this.GLYPH_W) / 2), 90, "#88aacc");
 
-    // ---- Last save slot  (y = 116, 130) ----
+    // ---- Last save slot  (y = 114, 126, 138) ----
+    // Split into two lines so neither overflows the 208px panel:
+    //   "${rescued}/${total} leaves" ≤ 14 chars × 10px = 140px  ✓
+    //   "${timeStr}"                  = 8 chars  × 10px =  80px  ✓
     if (savedGame) {
       const saveLabel = "LAST SAVE:";
       this._drawOutlined(saveLabel,
-        Math.round((viewW - saveLabel.length * this.GLYPH_W) / 2), 116, "#ff9900");
+        Math.round((viewW - saveLabel.length * this.GLYPH_W) / 2), 114, "#ff9900");
 
-      const rescued = savedGame.leavesRescued ?? 0;
-      const total   = savedGame.totalLeaves   ?? 0;
-      const timeStr = _formatMs(savedGame.elapsedMs ?? 0);
-      const saveInfo = `${rescued}/${total} leaves  ${timeStr}`;
-      this._drawOutlined(saveInfo,
-        Math.round((viewW - saveInfo.length * this.GLYPH_W) / 2), 130, "#ffcc66");
+      const rescued   = savedGame.leavesRescued ?? 0;
+      const total     = savedGame.totalLeaves   ?? 0;
+      const timeStr   = _formatMs(savedGame.elapsedMs ?? 0);
+
+      const saveLine1 = `${rescued}/${total} leaves`;
+      const saveLine2 = timeStr;
+
+      this._drawOutlined(saveLine1,
+        Math.round((viewW - saveLine1.length * this.GLYPH_W) / 2), 126, "#ffcc66");
+      this._drawOutlined(saveLine2,
+        Math.round((viewW - saveLine2.length * this.GLYPH_W) / 2), 138, "#ffcc66");
     }
 
     // "Press ENTER" blink  (y = 152 = viewH-40)

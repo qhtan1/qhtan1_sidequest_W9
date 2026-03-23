@@ -183,6 +183,13 @@ export class Level {
   }
 
   update({ input }) {
+    // GUARD: new Group() / new Sprite() in some p5play builds silently reset
+    // world.autoStep to true, which causes the physics engine to self-step AND
+    // then step again in world.step() below — double-stepping makes the player
+    // fall through floors and get permanently stuck in jump pose.
+    // Re-asserting here every frame is the reliable belt-and-suspenders fix.
+    world.autoStep = false;
+
     // --- Fire pit repeated damage logic ---
     const player = this.player;
     const playerCtrl = this.playerCtrl;
@@ -260,14 +267,18 @@ export class Level {
     // reset player entity/controller state
     this.playerCtrl.reset();
 
-    // respawn leaves (overlap-only)
+    // Respawn leaves: restore position + visibility.
+    // We do NOT call removeColliders() here — removing a live fixture in the
+    // middle of a physics frame can corrupt Box2D's contact graph (same reason
+    // _rescueLeaf no longer calls it).  The player↔leaf group sensor wired in
+    // _wirePlayerInteractionsOnce() already makes leaves non-solid for the
+    // player; leaves never had a collision relationship with boars either.
     for (const item of this.leafSpawns) {
       const s = item.s;
       s.x = item.x;
       s.y = item.y;
       s.active = true;
       s.visible = true;
-      s.removeColliders();
     }
 
     // clear and rebuild boars from cached spawns (creates a NEW Group)
@@ -378,7 +389,15 @@ export class Level {
 
     leafSprite.active = false;
     leafSprite.visible = false;
-    leafSprite.removeColliders();
+    // IMPORTANT: do NOT call leafSprite.removeColliders() here.
+    // Removing a Box2D fixture while the player body is in contact with it
+    // (which is guaranteed — this callback fires on contact) corrupts the
+    // contact graph and can permanently break the player's physics (stuck in
+    // jump pose, can't move).  Instead, teleport the leaf far off-screen so
+    // it's no longer in contact with anything.  The fixture stays alive but
+    // unreachable, so there is no physics disruption.
+    leafSprite.x = -9999;
+    leafSprite.y = -9999;
 
     // Record which leaf index was collected so save/load can restore exactly
     // the right sprites (not just "first N").
