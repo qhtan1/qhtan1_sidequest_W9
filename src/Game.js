@@ -71,6 +71,21 @@ export class Game {
   }
 
   build() {
+    // Reset all terminal/flow flags so ESC → menu → Enter always starts fresh.
+    // Without this, game.won/game.lost from a previous run would prevent
+    // level.update() from running and freeze all sprite animations.
+    this.lost  = false;
+    this.won   = false;
+    this._submittedWin = false;
+    this.elapsedMs = 0;
+    this.lastWinMs = null;
+    this.awaitingName = false;
+    this.lastRank = null;
+    this.nameEntry = "AAA";
+    this._nameCursor = 0;
+    this._blink = 0;
+    this.winScreenState = "default";
+
     this.level = new Level(this.pkg, this.assets, {
       hudGfx: this.hudGfx,
       events: this.events,
@@ -288,7 +303,7 @@ export class Game {
     if (this.debug) this.debug.draw?.({ game: this });
   }
 
-  restart() {
+  restart(opts = {}) {
     // reset coordinator flags immediately
     this.lost = false;
     this.won = false;
@@ -306,7 +321,8 @@ export class Game {
     this._blink = 0;
     this.winScreenState = "default";
 
-    this.level.restart();
+    // opts.preserveKills = true when loading a save (keep killed-boar state)
+    this.level.restart(opts);
 
     // Re-enable animations that were frozen during terminal state
     for (const s of allSprites) {

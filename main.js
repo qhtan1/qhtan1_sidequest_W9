@@ -53,6 +53,7 @@ import { MenuScreen } from "./src/ui/MenuScreen.js";
 import { PauseScreen } from "./src/ui/PauseScreen.js";
 import { LoadScreen } from "./src/ui/LoadScreen.js";
 import { DebugMenu } from "./src/ui/DebugMenu.js";
+import { SettingsScreen, initSettings } from "./src/ui/SettingsScreen.js";
 
 /* -----------------------------------------------------------
    HIGH SCORE SYSTEM
@@ -135,11 +136,15 @@ let loseScreen;
 let menuScreen;
 let pauseScreen;
 let loadScreen;
+let settingsScreen;
 let parallaxLayers = []; // Preloaded parallax layer defs [{ img, factor }, ...]
 
 // Page state machine: "menu" | "playing"
 // (win/lose/pause/load are overlays drawn on top of "playing", not separate states)
 let gameState = "menu";
+
+// Settings overlay flag: true while settings panel is open over the menu
+let settingsOpen = false;
 
 // Pause flag (separate from debug menu pause)
 let gamePaused = false;
@@ -309,6 +314,7 @@ function initRuntime() {
         totalLeaves:          lvl?.WIN_SCORE             ?? 0,
         elapsedMs:            game.elapsedMs             ?? 0,
         collectedLeafIndices: [...(lvl?.collectedLeafIndices ?? [])],
+        killedBoarIndices:    [...(lvl?.killedBoarIndices    ?? [])],
         health:               lvl?.player?.health        ?? lvl?.player?.maxHealth ?? 3,
       });
     }, 100);
@@ -319,12 +325,16 @@ function initRuntime() {
   // which auto-render every frame — calling build() here would make boars,
   // leaves, fire, etc. bleed through the menu panel.
 
+  // Accessibility settings (loads from localStorage, exposes window.settings)
+  initSettings();
+
   // UI overlays
   winScreen = new WinScreen(levelPkg, assets);
   loseScreen = new LoseScreen(levelPkg, assets);
   menuScreen = new MenuScreen(levelPkg, assets);
   pauseScreen = new PauseScreen(levelPkg, assets);
   loadScreen = new LoadScreen(levelPkg, assets);
+  settingsScreen = new SettingsScreen(levelPkg, assets);
 
   // VIEW: camera follow + clamp (target set after build())
   cameraController = new CameraController(levelPkg);
@@ -379,12 +389,18 @@ function draw() {
     menuScreen?.draw({
       topScores: highScoreManager?.getTop(START_LEVEL_ID) ?? [],
       savedGame: saveManager?.load() ?? null,
+      showSettingsHint: true,
     });
 
-    // Enter key → build world and start the game
+    // Settings overlay on top of menu
+    if (settingsOpen) {
+      settingsScreen?.draw();
+    }
+
+    // Enter key → build world and start the game (blocked while settings open)
     if (inputManager) {
       inputManager.update();
-      if (inputManager.input.enterPressed) {
+      if (!settingsOpen && inputManager.input.enterPressed) {
         // Always build if not yet built (ESC resets gameBuilt → false,
         // so re-entering always gets a fresh world with no stale sprites)
         if (!gameBuilt) {
@@ -517,6 +533,22 @@ function keyPressed(evt) {
     return false;
   }
 
+  // O → open/close settings (from menu only)
+  if (evt && (evt.key === "o" || evt.key === "O") && gameState === "menu") {
+    settingsOpen = !settingsOpen;
+    return false;
+  }
+
+  // When settings panel is open, route nav keys to it; ESC closes it
+  if (settingsOpen && gameState === "menu") {
+    if (evt && evt.key === "Escape") {
+      settingsOpen = false;
+      return false;
+    }
+    if (settingsScreen?.handleKey(evt?.key)) return false;
+    return false; // block all other keys while settings open
+  }
+
   // ESC → if load screen is open, close it; otherwise return to menu
   if (evt && evt.key === "Escape" && gameState === "playing") {
     if (gameLoading) {
@@ -536,7 +568,13 @@ function keyPressed(evt) {
   if (evt && evt.key === "Enter" && gameLoading && gameState === "playing") {
     const sv = saveManager?.load();
     if (sv) {
-      game.restart();           // resets level, player, boars, timer to 0
+      // Set killed-boar indices BEFORE restart so rebuildBoarsFromSpawns can
+      // skip them. (leaf/health are restored AFTER restart since restart()
+      // repositions all leaf sprites back to their spawn points first.)
+      const savedKills = Array.isArray(sv.killedBoarIndices) ? sv.killedBoarIndices : [];
+      game.level.killedBoarIndices = [...savedKills];
+
+      game.restart({ preserveKills: true }); // resets level, rebuilds boars (skipping kills)
       world.autoStep = false;   // re-assert: allSprites changes can reset this
 
       // Restore timer to saved value
@@ -586,6 +624,7 @@ function keyPressed(evt) {
       totalLeaves:          lvl?.WIN_SCORE             ?? 0,
       elapsedMs:            game.elapsedMs             ?? 0,
       collectedLeafIndices: [...(lvl?.collectedLeafIndices ?? [])],
+      killedBoarIndices:    [...(lvl?.killedBoarIndices    ?? [])],
       health:               lvl?.player?.health        ?? lvl?.player?.maxHealth ?? 3,
     });
     _showNotif("SAVED!");

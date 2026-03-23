@@ -139,18 +139,21 @@ export class PlayerEntity {
     this.sprite.friction = 0;
     this.sprite.bounciness = 0;
 
-    // ground sensor (query-only)
-    this.sensor = new Sprite();
-    this.sensor.x = this.sprite.x;
-    this.sensor.y = this.sprite.y + this.sprite.h / 2;
-    this.sensor.w = this.sprite.w;
-    this.sensor.h = 2;
-    this.sensor.mass = 0.01;
-    this.sensor.removeColliders();
-    this.sensor.visible = false;
-
-    const j = new GlueJoint(this.sprite, this.sensor);
-    j.visible = false;
+    // Ground foot probe — mirrors the boar groundProbe pattern.
+    // Placed 1 px below the player's feet every frame inside isGrounded().
+    // Using collider:"none" (no physics fixture, but bounding-box overlapping() works)
+    // instead of removeColliders() which strips the body and breaks overlapping().
+    // No GlueJoint needed — position is updated manually each frame.
+    this.sensor = null; // legacy reference kept null (isGrounded no longer uses it)
+    this.footProbe = new Sprite(-9999, -9999, this.COLLIDER_W, 2);
+    this.footProbe.collider   = "none";
+    this.footProbe.physics    = "dynamic";
+    this.footProbe.gravity    = 0;
+    this.footProbe.mass       = 0.0001;
+    this.footProbe.rotationLock = true;
+    this.footProbe.friction   = 0;
+    this.footProbe.bounciness = 0;
+    this.footProbe.visible    = false;
 
     return this;
   }
@@ -178,6 +181,12 @@ export class PlayerEntity {
     this.sprite.vel.y = 0;
     this.sprite.tint = "#ffffff";
 
+    // Move foot probe off-screen so it doesn't trigger false overlaps at origin
+    if (this.footProbe) {
+      this.footProbe.x = -9999;
+      this.footProbe.y = -9999;
+    }
+
     this._setAni("idle");
   }
 
@@ -187,20 +196,24 @@ export class PlayerEntity {
   isGrounded(solids) {
     if (!this.sprite) return false;
 
-    // Primary: p5play v3 contact-based detection.
-    // sprite.touching.bottom is truthy when the player's physics body has
-    // a downward contact — reliable even after allSprites.remove() + rebuild
-    // because it uses the player sprite's own contacts, not a separate sensor.
+    // Update foot probe to sit 1 px below the player's collider feet.
+    // Must be done before the overlap checks below.
+    if (this.footProbe) {
+      this.footProbe.x   = this.sprite.x;
+      this.footProbe.y   = this.sprite.y + this.COLLIDER_H / 2 + 1;
+      this.footProbe.vel.x = 0;
+      this.footProbe.vel.y = 0;
+    }
+
+    // Primary: p5play v3 contact-based detection (works when available).
     if (this.sprite.touching?.bottom) return true;
 
-    // Fallback: original sensor-based overlap check
-    // (sensor has removeColliders() called, so this may not work in all
-    //  p5play states, but kept as a safety net)
-    const s = this.sensor;
-    if (!s) return false;
+    // Secondary: foot probe bounding-box overlap with each solid group.
+    // Mirrors boar groundProbe pattern — collider:"none" sprites keep their
+    // bounding box so overlapping() works without a physics fixture.
     const list = Array.isArray(solids) ? solids : Object.values(solids || {});
     for (const g of list) {
-      if (g && s.overlapping(g)) return true;
+      if (g && this.footProbe?.overlapping(g)) return true;
     }
     return false;
   }
@@ -330,8 +343,13 @@ export class PlayerEntity {
     if (!this.sprite) return;
 
     if (!this.dead && this.invulnTimer > 0) {
-      this.sprite.tint =
-        Math.floor(this.invulnTimer / 4) % 2 === 0 ? "#ff5050" : "#ffffff";
+      // Reduced-motion: show a steady tint instead of blinking
+      if (window.settings?.reducedMotion) {
+        this.sprite.tint = "#ff5050";
+      } else {
+        this.sprite.tint =
+          Math.floor(this.invulnTimer / 4) % 2 === 0 ? "#ff5050" : "#ffffff";
+      }
     } else {
       this.sprite.tint = "#ffffff";
     }

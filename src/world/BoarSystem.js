@@ -188,14 +188,22 @@ export function hookBoarSolids(level) {
 export function cacheBoarSpawns(level) {
   level.boarSpawns = [];
   if (!level.boar) return;
+  let idx = 0;
   for (const e of level.boar) {
+    // Assign spawn index so kill tracking can reference boarSpawns[] by position.
+    e.spawnIdx = idx;
     level.boarSpawns.push({ x: e.x, y: e.y, dir: e.dir });
+    idx++;
   }
 }
 
 export function clearBoars(level) {
   if (!level.boar) return;
-  for (const e of level.boar) {
+  // Snapshot first: p5play Groups are live collections — removing an element
+  // mid-iteration shifts indices and causes every other boar to be skipped,
+  // leaving phantom sprites in allSprites that pile up on the next rebuild.
+  const snapshot = [...level.boar];
+  for (const e of snapshot) {
     e.footProbe?.remove?.();
     e.frontProbe?.remove?.();
     e.groundProbe?.remove?.();
@@ -215,9 +223,14 @@ export function rebuildBoarsFromSpawns(level) {
   const boarH = Number(level.tuning.boar?.h ?? 12);
   const boarHP = Number(level.tuning.boar?.hp ?? 3);
 
-  for (const s of level.boarSpawns) {
+  for (let spawnI = 0; spawnI < level.boarSpawns.length; spawnI++) {
+    // Skip boars that were killed and saved — preserves kill state across loads.
+    if (level.killedBoarIndices?.includes(spawnI)) continue;
+
+    const s = level.boarSpawns[spawnI];
     // Create with desired collider size (most reliable across builds)
     const e = new Sprite(s.x, s.y, boarW, boarH);
+    e.spawnIdx = spawnI; // ← track which boarSpawns[] entry this came from
 
     // Sheet/anis (safe)
     const hasDefs =
@@ -388,7 +401,12 @@ export function updateBoars(level) {
       // Debug: Recovery started (removed console.log for production)
     }
 
-    e.tint = e.flashTimer > 0 ? "#ff5050" : "#ffffff";
+    // Reduced motion: steady hurt tint instead of frame-alternating flash
+    if (e.flashTimer > 0) {
+      e.tint = "#ff5050";
+    } else {
+      e.tint = "#ffffff";
+    }
 
     const grounded = boarGrounded(level, e);
     const frontHitsHazard = frontProbeHitsHazard(level, e); // used even when airborne

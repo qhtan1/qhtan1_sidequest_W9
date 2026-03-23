@@ -21,7 +21,7 @@ export class MenuScreen {
     this._blink = 0;
   }
 
-  draw({ topScores = [], savedGame = null } = {}) {
+  draw({ topScores = [], savedGame = null, showSettingsHint = false } = {}) {
     const viewW = this.pkg.view?.viewW ?? this.pkg.view?.w ?? 240;
     const viewH = this.pkg.view?.viewH ?? this.pkg.view?.h ?? 192;
 
@@ -126,6 +126,13 @@ export class MenuScreen {
       const prompt = savedGame ? "ENTER: new game" : "Press ENTER to start";
       const txPrompt = Math.round((viewW - prompt.length * this.GLYPH_W) / 2);
       this._drawOutlined(prompt, txPrompt, viewH - 16, "#00ff7a");
+    }
+
+    // Settings hint (bottom-right area)
+    if (showSettingsHint) {
+      const hint = "O: settings";
+      const txHint = Math.round((viewW - hint.length * this.GLYPH_W) / 2);
+      this._drawOutlined(hint, txHint, viewH - 6, "#446655");
     }
 
     camera.on();

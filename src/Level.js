@@ -71,6 +71,8 @@ export class Level {
     this.boarSpawns = [];
     // indices into leafSpawns[] that have been collected this run
     this.collectedLeafIndices = [];
+    // indices into boarSpawns[] that have been killed this run
+    this.killedBoarIndices = [];
 
     // cached HUD state
     this._lastScore = null;
@@ -240,10 +242,12 @@ export class Level {
     allSprites.draw();
   }
 
-  restart() {
+  restart({ preserveKills = false } = {}) {
     this.won = false;
     this.score = 0;
     this.collectedLeafIndices = [];
+    // Only reset kill list for a fresh R-key restart; load flow preserves it.
+    if (!preserveKills) this.killedBoarIndices = [];
 
     // reset timer on restart
     this.elapsedMs = 0;
@@ -450,6 +454,13 @@ export class Level {
       // In the monolith you set "throwPose" here (not "death").
       // Actual death animation starts later inside BoarSystem when grounded.
       this._setAniFrame0Safe(e, "throwPose");
+
+      // Track kill by spawn index so save/load can skip this boar on reload.
+      const spawnIdx = e.spawnIdx;
+      if (spawnIdx != null && spawnIdx >= 0 &&
+          !this.killedBoarIndices.includes(spawnIdx)) {
+        this.killedBoarIndices.push(spawnIdx);
+      }
 
       this.events?.emit("boar:died", { x: e.x, y: e.y });
       return;
