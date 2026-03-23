@@ -77,6 +77,31 @@ function loadJSONAsync(url) {
   });
 }
 
+function hideProbeSprites() {
+  for (const s of allSprites) {
+    const hasVisual =
+      !!s.ani || !!s.img || !!s.image || !!s.spriteSheet || !!s.animation;
+
+    const thinBar =
+      Number(s.w ?? 0) >= 8 && Number(s.h ?? 0) > 0 && Number(s.h ?? 0) <= 4;
+
+    const giantOverlay =
+      Number(s.w ?? 0) >= width * 0.8 &&
+      Number(s.h ?? 0) >= height * 0.8 &&
+      !hasVisual;
+
+    const helperName =
+      typeof s.name === "string" && /probe|sensor|helper|ground/i.test(s.name);
+
+    if ((!hasVisual && thinBar) || giantOverlay || helperName) {
+      s.visible = false;
+      s.color = "rgba(0,0,0,0)";
+      s.stroke = "rgba(0,0,0,0)";
+      s.strokeWeight = 0;
+    }
+  }
+}
+
 // Browsers block audio until a user gesture.
 // We unlock it once and never think about it again.
 let audioUnlocked = false;
@@ -531,6 +556,7 @@ function draw() {
   const isLoading = gameLoading; // load-screen overlay
   if (!isPaused && !isLoading) {
     game.update();
+    hideProbeSprites();
     hideHelperSprites();
   } else {
     hideHelperSprites();
