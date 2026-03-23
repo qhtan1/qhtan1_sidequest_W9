@@ -359,6 +359,8 @@ function createFreshRun() {
   allSprites.remove();
 
   // Build a brand-new Game instance
+  inputManager = new InputManager();
+
   game = new Game(levelPkg, assets, {
     hudGfx,
     inputManager,
@@ -582,6 +584,20 @@ function keyPressed(evt) {
     return false;
   }
 
+  // R → full fresh restart from terminal states
+  if (
+    (evt?.key === "r" || evt?.key === "R") &&
+    gameState === "playing" &&
+    game &&
+    (game.won || game.lost || game.level?.player?.dead)
+  ) {
+    createFreshRun();
+    gamePaused = false;
+    gameLoading = false;
+    gameState = "playing";
+    return false;
+  }
+
   // O → open/close settings (from menu only)
   if (evt && (evt.key === "o" || evt.key === "O") && gameState === "menu") {
     settingsOpen = !settingsOpen;
@@ -595,32 +611,20 @@ function keyPressed(evt) {
       return false;
     }
     if (settingsScreen?.handleKey(evt?.key)) return false;
-    return false; // block all other keys while settings open
+    return false;
   }
 
   // ESC → if load screen is open, close it; otherwise return to menu
   if (evt && evt.key === "Escape" && gameState === "playing") {
-    if (
-      (evt?.key === "r" || evt?.key === "R") &&
-      gameState === "playing" &&
-      game &&
-      (game.won || game.lost || game.level?.player?.dead)
-    ) {
-      createFreshRun();
-      gamePaused = false;
-      gameLoading = false;
-      gameState = "playing";
-      return false;
-    }
     if (gameLoading) {
-      // Close the load screen and resume game (animations were never frozen)
       gameLoading = false;
       return false;
     }
-    game?.level?.destroy?.();
-    allSprites.remove(); // destroy all p5play sprites so none bleed into menu
 
-    gameBuilt = false; // force a fresh game.build() on next Enter
+    game?.level?.destroy?.();
+    allSprites.remove();
+
+    gameBuilt = false;
     gamePaused = false;
     gameLoading = false;
     gameState = "menu";
@@ -631,34 +635,26 @@ function keyPressed(evt) {
   if (evt && evt.key === "Enter" && gameLoading && gameState === "playing") {
     const sv = saveManager?.load();
     if (sv) {
-      // Set killed-boar indices BEFORE restart so rebuildBoarsFromSpawns can
-      // skip them. (leaf/health are restored AFTER restart since restart()
-      // repositions all leaf sprites back to their spawn points first.)
       const savedKills = Array.isArray(sv.killedBoarIndices)
         ? sv.killedBoarIndices
         : [];
       game.level.killedBoarIndices = [...savedKills];
 
-      game.restart({ preserveKills: true }); // resets level, rebuilds boars (skipping kills)
-      world.autoStep = false; // re-assert: allSprites changes can reset this
+      game.restart({ preserveKills: true });
+      world.autoStep = false;
 
-      // Restore timer to saved value
       game.level.elapsedMs = sv.elapsedMs ?? 0;
 
-      // Restore health (restart() resets to full; we bring it back to saved value)
       if (sv.health != null && game.level?.player) {
-        game.level.player.health = Math.max(1, sv.health); // never restore at 0 hp
-        game.level._lastHealth = null; // force HUD redraw
+        game.level.player.health = Math.max(1, sv.health);
+        game.level._lastHealth = null;
       }
 
-      // Restore EXACTLY the leaves that were collected when the save was made.
-      // sv.collectedLeafIndices holds the indices into leafSpawns[]; older saves
-      // without this field fall back to hiding the first N leaves.
       const savedIndices =
         Array.isArray(sv.collectedLeafIndices) &&
         sv.collectedLeafIndices.length > 0
           ? sv.collectedLeafIndices
-          : Array.from({ length: sv.leavesRescued ?? 0 }, (_, i) => i); // fallback
+          : Array.from({ length: sv.leavesRescued ?? 0 }, (_, i) => i);
 
       let restored = 0;
       if (game.level.leafSpawns) {
@@ -667,13 +663,12 @@ function keyPressed(evt) {
           if (!item?.s) continue;
           item.s.active = false;
           item.s.visible = false;
-          item.s.y = -9999; // move off-screen (belt-and-suspenders)
+          item.s.y = -9999;
           restored++;
         }
-        // Sync score + collectedLeafIndices so future saves stay accurate
         game.level.score = restored;
         game.level.collectedLeafIndices = [...savedIndices];
-        game.level._lastScore = null; // force HUD redraw
+        game.level._lastScore = null;
       }
 
       _showNotif(
@@ -705,22 +700,21 @@ function keyPressed(evt) {
     return false;
   }
 
-  // L → open the load-save overlay (only during active play, not when already loading)
+  // L → open the load-save overlay
   if (
     (evt?.key === "l" || evt?.key === "L") &&
     gameState === "playing" &&
     !gameLoading
   ) {
     gameLoading = true;
-    gamePaused = false; // load screen replaces pause; no need for both
+    gamePaused = false;
     return false;
   }
 
-  // Pause toggle: P key (only during active gameplay)
-  if ((evt && evt.key === "p") || evt?.key === "P") {
+  // Pause toggle: P key
+  if (evt && (evt.key === "p" || evt.key === "P")) {
     if (gameState === "playing" && game && !game.won && !game.lost) {
       gamePaused = !gamePaused;
-      // Re-enable sprite animations when resuming from pause
       if (!gamePaused) {
         for (const s of allSprites) {
           if (s.ani) {
@@ -733,19 +727,19 @@ function keyPressed(evt) {
     }
   }
 
-  // Debug menu: toggle with backtick (`) key
+  // Debug menu
   if (evt && (evt.key === "`" || evt.key === "Dead")) {
     debugMenu.toggle();
     return false;
   }
-  // If debug menu is open, only handle debug menu navigation/toggles
+
   if (window.gamePaused) {
     if (debugMenu?.enabled && debugMenu.handleInput(evt)) {
       return false;
     }
-    // Block all other input
     return false;
   }
+
   return preventKeysThatScroll(evt);
 }
 
