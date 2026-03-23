@@ -69,6 +69,8 @@ export class Level {
     // restart bookkeeping
     this.leafSpawns = [];
     this.boarSpawns = [];
+    // indices into leafSpawns[] that have been collected this run
+    this.collectedLeafIndices = [];
 
     // cached HUD state
     this._lastScore = null;
@@ -241,6 +243,7 @@ export class Level {
   restart() {
     this.won = false;
     this.score = 0;
+    this.collectedLeafIndices = [];
 
     // reset timer on restart
     this.elapsedMs = 0;
@@ -362,6 +365,11 @@ export class Level {
     leafSprite.active = false;
     leafSprite.visible = false;
     leafSprite.removeColliders();
+
+    // Record which leaf index was collected so save/load can restore exactly
+    // the right sprites (not just "first N").
+    const leafIdx = this.leafSpawns.findIndex((item) => item.s === leafSprite);
+    if (leafIdx >= 0) this.collectedLeafIndices.push(leafIdx);
 
     this.score++;
     this.events?.emit("leaf:collected", {

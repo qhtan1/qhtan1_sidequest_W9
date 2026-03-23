@@ -305,9 +305,11 @@ function initRuntime() {
     setTimeout(() => {
       const lvl = game.level;
       saveManager.save({
-        leavesRescued: lvl?.score     ?? 0,   // Level.score = leaves collected
-        totalLeaves:   lvl?.WIN_SCORE ?? 0,   // Level.WIN_SCORE = target count
-        elapsedMs:     game.elapsedMs ?? 0,
+        leavesRescued:        lvl?.score                ?? 0,
+        totalLeaves:          lvl?.WIN_SCORE             ?? 0,
+        elapsedMs:            game.elapsedMs             ?? 0,
+        collectedLeafIndices: [...(lvl?.collectedLeafIndices ?? [])],
+        health:               lvl?.player?.health        ?? lvl?.player?.maxHealth ?? 3,
       });
     }, 100);
   });
@@ -540,23 +542,33 @@ function keyPressed(evt) {
       // Restore timer to saved value
       game.level.elapsedMs = sv.elapsedMs ?? 0;
 
-      // Restore leaf collection state: mark the first N leaves as already collected
-      // so HUD and remaining pickups match what was saved.
-      const toRestore = Math.min(sv.leavesRescued ?? 0, game.level.leafSpawns?.length ?? 0);
-      if (toRestore > 0 && game.level.leafSpawns) {
-        for (let i = 0; i < toRestore; i++) {
-          const item = game.level.leafSpawns[i];
-          if (item?.s) {
-            item.s.active  = false;
-            item.s.visible = false;
-            // Belt-and-suspenders: move off-screen in case visible=false
-            // doesn't suppress drawing for group sprites in this p5play build.
-            // Level.restart() already does `s.y = item.y` so restart restores it.
-            item.s.y = -9999;
-          }
+      // Restore health (restart() resets to full; we bring it back to saved value)
+      if (sv.health != null && game.level?.player) {
+        game.level.player.health = Math.max(1, sv.health); // never restore at 0 hp
+        game.level._lastHealth = null; // force HUD redraw
+      }
+
+      // Restore EXACTLY the leaves that were collected when the save was made.
+      // sv.collectedLeafIndices holds the indices into leafSpawns[]; older saves
+      // without this field fall back to hiding the first N leaves.
+      const savedIndices = Array.isArray(sv.collectedLeafIndices) && sv.collectedLeafIndices.length > 0
+        ? sv.collectedLeafIndices
+        : Array.from({ length: sv.leavesRescued ?? 0 }, (_, i) => i); // fallback
+
+      let restored = 0;
+      if (game.level.leafSpawns) {
+        for (const idx of savedIndices) {
+          const item = game.level.leafSpawns[idx];
+          if (!item?.s) continue;
+          item.s.active  = false;
+          item.s.visible = false;
+          item.s.y       = -9999; // move off-screen (belt-and-suspenders)
+          restored++;
         }
-        game.level.score = toRestore;
-        game.level._lastScore = null; // force HUD redraw on next update
+        // Sync score + collectedLeafIndices so future saves stay accurate
+        game.level.score = restored;
+        game.level.collectedLeafIndices = [...savedIndices];
+        game.level._lastScore = null; // force HUD redraw
       }
 
       _showNotif(`LOADED: ${sv.leavesRescued}/${sv.totalLeaves}  ${_fmtMs(sv.elapsedMs)}`);
@@ -570,9 +582,11 @@ function keyPressed(evt) {
   if ((evt?.key === "s" || evt?.key === "S") && gameState === "playing" && !game.won && !game.lost) {
     const lvl = game.level;
     saveManager.save({
-      leavesRescued: lvl?.score     ?? 0,
-      totalLeaves:   lvl?.WIN_SCORE ?? 0,
-      elapsedMs:     game.elapsedMs ?? 0,
+      leavesRescued:        lvl?.score                ?? 0,
+      totalLeaves:          lvl?.WIN_SCORE             ?? 0,
+      elapsedMs:            game.elapsedMs             ?? 0,
+      collectedLeafIndices: [...(lvl?.collectedLeafIndices ?? [])],
+      health:               lvl?.player?.health        ?? lvl?.player?.maxHealth ?? 3,
     });
     _showNotif("SAVED!");
     return false;
