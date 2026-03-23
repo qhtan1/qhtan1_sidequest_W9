@@ -113,6 +113,8 @@ let cameraController; // VIEW: follow + clamp camera to world bounds
 let inputManager; // SYSTEM: keyboard snapshot
 let soundManager; // SYSTEM: audio registry
 let debugOverlay; // VIEW/SYSTEM: debug UI
+const AUTO_START_KEY = "w9_autostart_after_reload";
+let hasStartedOnce = false;
 
 // Global debug state (shared by DebugMenu and WORLD logic)
 window.debugState = {
@@ -349,6 +351,15 @@ function initRuntime() {
   parallax = new ParallaxBackground(parallaxLayers);
 
   loop();
+
+  // If we intentionally reloaded to start a fresh run, do it immediately
+  if (sessionStorage.getItem(AUTO_START_KEY) === "1") {
+    sessionStorage.removeItem(AUTO_START_KEY);
+    createFreshRun();
+    gamePaused = false;
+    gameLoading = false;
+    gameState = "playing";
+  }
 }
 
 function createFreshRun() {
@@ -397,6 +408,12 @@ function createFreshRun() {
   cameraController.reset();
 
   gameBuilt = true;
+  hasStartedOnce = true;
+}
+
+function restartViaReload() {
+  sessionStorage.setItem(AUTO_START_KEY, "1");
+  window.location.reload();
 }
 
 // ------------------------------------------------------------
@@ -449,10 +466,16 @@ function draw() {
     if (inputManager) {
       inputManager.update();
       if (!settingsOpen && inputManager.input.enterPressed) {
-        createFreshRun();
-        gamePaused = false;
-        gameLoading = false;
-        gameState = "playing";
+        // First time: build normally
+        if (!hasStartedOnce) {
+          createFreshRun();
+          gamePaused = false;
+          gameLoading = false;
+          gameState = "playing";
+        } else {
+          // After returning from an old run, force a clean page reload
+          restartViaReload();
+        }
       }
     }
     return; // skip world update + draw while on menu
@@ -591,10 +614,7 @@ function keyPressed(evt) {
     game &&
     (game.won || game.lost || game.level?.player?.dead)
   ) {
-    createFreshRun();
-    gamePaused = false;
-    gameLoading = false;
-    gameState = "playing";
+    restartViaReload();
     return false;
   }
 
@@ -621,10 +641,6 @@ function keyPressed(evt) {
       return false;
     }
 
-    game?.level?.destroy?.();
-    allSprites.remove();
-
-    gameBuilt = false;
     gamePaused = false;
     gameLoading = false;
     gameState = "menu";
