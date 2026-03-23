@@ -315,7 +315,23 @@ export function updateBoars(level) {
 
   for (const old of boarsSnapshot) {
     let e = old;
+    const killY = (level.bounds?.levelH ?? 0) + 64;
+    if (e.y > killY) {
+      const spawnIdx = e.spawnIdx;
+      if (
+        spawnIdx != null &&
+        spawnIdx >= 0 &&
+        !level.killedBoarIndices.includes(spawnIdx)
+      ) {
+        level.killedBoarIndices.push(spawnIdx);
+      }
 
+      e.footProbe?.remove?.();
+      e.frontProbe?.remove?.();
+      e.groundProbe?.remove?.();
+      e.remove?.();
+      continue;
+    }
     // -----------------------------
     // One-time init for Tiles() boars
     // -----------------------------
@@ -344,7 +360,8 @@ export function updateBoars(level) {
         // add defs (safe)
         try {
           // only attempt if missing something obvious
-          if (!e.anis || !e.anis.run) e.addAnis(cloneAnis(level.assets.boarAnis));
+          if (!e.anis || !e.anis.run)
+            e.addAnis(cloneAnis(level.assets.boarAnis));
         } catch (err) {
           // ignore; ensureBoarAnis will also try
         }
@@ -571,7 +588,8 @@ export function updateBoars(level) {
     }
 
     // patrol — reduced motion slows boar to 40% speed (user-requested -60% reduction)
-    const effectiveSpeed = boarSpeed * (window.settings?.reducedMotion ? 0.4 : 1);
+    const effectiveSpeed =
+      boarSpeed * (window.settings?.reducedMotion ? 0.4 : 1);
     e.vel.x = e.dir * effectiveSpeed;
     e.mirror.x = e.dir === -1;
 

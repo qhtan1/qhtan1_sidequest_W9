@@ -157,20 +157,20 @@ let gameLoading = false;
 let gameBuilt = false;
 
 // Brief on-screen notification (e.g. "SAVED!" / "LOADED: ...")
-let _notifText  = "";
+let _notifText = "";
 let _notifFrames = 0;
 function _showNotif(text, frames = 120) {
-  _notifText  = text;
+  _notifText = text;
   _notifFrames = frames;
 }
 
 // Format milliseconds as MM:SS.hs (reused for notifications)
 function _fmtMs(ms) {
   ms = Number(ms) || 0;
-  const m  = Math.floor(ms / 60000);
-  const s  = Math.floor((ms % 60000) / 1000);
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
   const hs = Math.floor((ms % 1000) / 10);
-  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(hs).padStart(2,"0")}`;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(hs).padStart(2, "0")}`;
 }
 
 // Make URLs absolute so they can’t accidentally resolve relative to /src/...
@@ -310,12 +310,12 @@ function initRuntime() {
     setTimeout(() => {
       const lvl = game.level;
       saveManager.save({
-        leavesRescued:        lvl?.score                ?? 0,
-        totalLeaves:          lvl?.WIN_SCORE             ?? 0,
-        elapsedMs:            game.elapsedMs             ?? 0,
+        leavesRescued: lvl?.score ?? 0,
+        totalLeaves: lvl?.WIN_SCORE ?? 0,
+        elapsedMs: game.elapsedMs ?? 0,
         collectedLeafIndices: [...(lvl?.collectedLeafIndices ?? [])],
-        killedBoarIndices:    [...(lvl?.killedBoarIndices    ?? [])],
-        health:               lvl?.player?.health        ?? lvl?.player?.maxHealth ?? 3,
+        killedBoarIndices: [...(lvl?.killedBoarIndices ?? [])],
+        health: lvl?.player?.health ?? lvl?.player?.maxHealth ?? 3,
       });
     }, 100);
   });
@@ -349,6 +349,52 @@ function initRuntime() {
   parallax = new ParallaxBackground(parallaxLayers);
 
   loop();
+}
+
+function createFreshRun() {
+  // Clean old level listeners if present
+  game?.level?.destroy?.();
+
+  // Remove all existing p5play sprites
+  allSprites.remove();
+
+  // Build a brand-new Game instance
+  game = new Game(levelPkg, assets, {
+    hudGfx,
+    inputManager,
+    soundManager,
+    debugOverlay,
+    highScores: highScoreManager,
+  });
+
+  game.build();
+
+  // Re-create auto-save hook for this new game instance
+  game.events.on("level:won", () => {
+    setTimeout(() => {
+      const lvl = game.level;
+      saveManager.save({
+        leavesRescued: lvl?.score ?? 0,
+        totalLeaves: lvl?.WIN_SCORE ?? 0,
+        elapsedMs: game.elapsedMs ?? 0,
+        collectedLeafIndices: [...(lvl?.collectedLeafIndices ?? [])],
+        killedBoarIndices: [...(lvl?.killedBoarIndices ?? [])],
+        health: lvl?.player?.health ?? lvl?.player?.maxHealth ?? 3,
+      });
+    }, 100);
+  });
+
+  // Re-create camera reset hook for this new game instance
+  game.events.on("level:restarted", () => {
+    cameraController?.setTarget(game.level?.playerCtrl?.sprite);
+    cameraController?.reset();
+  });
+
+  world.autoStep = false;
+  cameraController.setTarget(game.level.playerCtrl.sprite);
+  cameraController.reset();
+
+  gameBuilt = true;
 }
 
 // ------------------------------------------------------------
@@ -401,17 +447,9 @@ function draw() {
     if (inputManager) {
       inputManager.update();
       if (!settingsOpen && inputManager.input.enterPressed) {
-        // Always build if not yet built (ESC resets gameBuilt → false,
-        // so re-entering always gets a fresh world with no stale sprites)
-        if (!gameBuilt) {
-          game.build();
-          gameBuilt = true;
-        }
-        // Re-assert manual stepping in case allSprites.remove() reset the world
-        world.autoStep = false;
-        cameraController.setTarget(game.level.playerCtrl.sprite);
-        cameraController.reset();
+        createFreshRun();
         gamePaused = false;
+        gameLoading = false;
         gameState = "playing";
       }
     }
@@ -428,14 +466,17 @@ function draw() {
   });
 
   // Pause game update if paused, loading, or debug menu is open
-  const isPaused  = gamePaused || !!window.gamePaused; // true pause (P key / debug)
-  const isLoading = gameLoading;                        // load-screen overlay
+  const isPaused = gamePaused || !!window.gamePaused; // true pause (P key / debug)
+  const isLoading = gameLoading; // load-screen overlay
   if (!isPaused && !isLoading) {
     game.update();
   } else {
     for (const s of allSprites) {
       // Always zero velocities so sprites don't drift while frozen
-      if (s.vel) { s.vel.x = 0; s.vel.y = 0; }
+      if (s.vel) {
+        s.vel.x = 0;
+        s.vel.y = 0;
+      }
       // Only freeze animations on a real P-key pause, NOT the load overlay.
       // This way animations are still running when load confirms, so no re-enable needed.
       if (isPaused && s.ani) s.ani.playing = false;
@@ -498,7 +539,8 @@ function draw() {
   // Brief save/load notification bar (fades out over last 30 frames)
   if (_notifFrames > 0) {
     _notifFrames--;
-    const alpha = _notifFrames > 30 ? 255 : Math.floor((_notifFrames / 30) * 255);
+    const alpha =
+      _notifFrames > 30 ? 255 : Math.floor((_notifFrames / 30) * 255);
     camera.off();
     push();
     noStroke();
@@ -528,7 +570,14 @@ function keyPressed(evt) {
   unlockAudioOnce();
 
   // Cheat: press \ to instantly win (for testing win screen)
-  if (evt && evt.key === "\\" && gameState === "playing" && game && !game.won && !game.lost) {
+  if (
+    evt &&
+    evt.key === "\\" &&
+    gameState === "playing" &&
+    game &&
+    !game.won &&
+    !game.lost
+  ) {
     game.events?.emit("level:won");
     return false;
   }
@@ -551,13 +600,27 @@ function keyPressed(evt) {
 
   // ESC → if load screen is open, close it; otherwise return to menu
   if (evt && evt.key === "Escape" && gameState === "playing") {
+    if (
+      (evt?.key === "r" || evt?.key === "R") &&
+      gameState === "playing" &&
+      game &&
+      (game.won || game.lost || game.level?.player?.dead)
+    ) {
+      createFreshRun();
+      gamePaused = false;
+      gameLoading = false;
+      gameState = "playing";
+      return false;
+    }
     if (gameLoading) {
       // Close the load screen and resume game (animations were never frozen)
       gameLoading = false;
       return false;
     }
+    game?.level?.destroy?.();
     allSprites.remove(); // destroy all p5play sprites so none bleed into menu
-    gameBuilt = false;   // force a fresh game.build() on next Enter
+
+    gameBuilt = false; // force a fresh game.build() on next Enter
     gamePaused = false;
     gameLoading = false;
     gameState = "menu";
@@ -571,11 +634,13 @@ function keyPressed(evt) {
       // Set killed-boar indices BEFORE restart so rebuildBoarsFromSpawns can
       // skip them. (leaf/health are restored AFTER restart since restart()
       // repositions all leaf sprites back to their spawn points first.)
-      const savedKills = Array.isArray(sv.killedBoarIndices) ? sv.killedBoarIndices : [];
+      const savedKills = Array.isArray(sv.killedBoarIndices)
+        ? sv.killedBoarIndices
+        : [];
       game.level.killedBoarIndices = [...savedKills];
 
       game.restart({ preserveKills: true }); // resets level, rebuilds boars (skipping kills)
-      world.autoStep = false;   // re-assert: allSprites changes can reset this
+      world.autoStep = false; // re-assert: allSprites changes can reset this
 
       // Restore timer to saved value
       game.level.elapsedMs = sv.elapsedMs ?? 0;
@@ -589,18 +654,20 @@ function keyPressed(evt) {
       // Restore EXACTLY the leaves that were collected when the save was made.
       // sv.collectedLeafIndices holds the indices into leafSpawns[]; older saves
       // without this field fall back to hiding the first N leaves.
-      const savedIndices = Array.isArray(sv.collectedLeafIndices) && sv.collectedLeafIndices.length > 0
-        ? sv.collectedLeafIndices
-        : Array.from({ length: sv.leavesRescued ?? 0 }, (_, i) => i); // fallback
+      const savedIndices =
+        Array.isArray(sv.collectedLeafIndices) &&
+        sv.collectedLeafIndices.length > 0
+          ? sv.collectedLeafIndices
+          : Array.from({ length: sv.leavesRescued ?? 0 }, (_, i) => i); // fallback
 
       let restored = 0;
       if (game.level.leafSpawns) {
         for (const idx of savedIndices) {
           const item = game.level.leafSpawns[idx];
           if (!item?.s) continue;
-          item.s.active  = false;
+          item.s.active = false;
           item.s.visible = false;
-          item.s.y       = -9999; // move off-screen (belt-and-suspenders)
+          item.s.y = -9999; // move off-screen (belt-and-suspenders)
           restored++;
         }
         // Sync score + collectedLeafIndices so future saves stay accurate
@@ -609,7 +676,9 @@ function keyPressed(evt) {
         game.level._lastScore = null; // force HUD redraw
       }
 
-      _showNotif(`LOADED: ${sv.leavesRescued}/${sv.totalLeaves}  ${_fmtMs(sv.elapsedMs)}`);
+      _showNotif(
+        `LOADED: ${sv.leavesRescued}/${sv.totalLeaves}  ${_fmtMs(sv.elapsedMs)}`,
+      );
     }
     gameLoading = false;
     gamePaused = false;
@@ -617,35 +686,47 @@ function keyPressed(evt) {
   }
 
   // S → manual save current run state
-  if ((evt?.key === "s" || evt?.key === "S") && gameState === "playing" && !game.won && !game.lost) {
+  if (
+    (evt?.key === "s" || evt?.key === "S") &&
+    gameState === "playing" &&
+    !game.won &&
+    !game.lost
+  ) {
     const lvl = game.level;
     saveManager.save({
-      leavesRescued:        lvl?.score                ?? 0,
-      totalLeaves:          lvl?.WIN_SCORE             ?? 0,
-      elapsedMs:            game.elapsedMs             ?? 0,
+      leavesRescued: lvl?.score ?? 0,
+      totalLeaves: lvl?.WIN_SCORE ?? 0,
+      elapsedMs: game.elapsedMs ?? 0,
       collectedLeafIndices: [...(lvl?.collectedLeafIndices ?? [])],
-      killedBoarIndices:    [...(lvl?.killedBoarIndices    ?? [])],
-      health:               lvl?.player?.health        ?? lvl?.player?.maxHealth ?? 3,
+      killedBoarIndices: [...(lvl?.killedBoarIndices ?? [])],
+      health: lvl?.player?.health ?? lvl?.player?.maxHealth ?? 3,
     });
     _showNotif("SAVED!");
     return false;
   }
 
   // L → open the load-save overlay (only during active play, not when already loading)
-  if ((evt?.key === "l" || evt?.key === "L") && gameState === "playing" && !gameLoading) {
+  if (
+    (evt?.key === "l" || evt?.key === "L") &&
+    gameState === "playing" &&
+    !gameLoading
+  ) {
     gameLoading = true;
     gamePaused = false; // load screen replaces pause; no need for both
     return false;
   }
 
   // Pause toggle: P key (only during active gameplay)
-  if (evt && evt.key === "p" || evt?.key === "P") {
+  if ((evt && evt.key === "p") || evt?.key === "P") {
     if (gameState === "playing" && game && !game.won && !game.lost) {
       gamePaused = !gamePaused;
       // Re-enable sprite animations when resuming from pause
       if (!gamePaused) {
         for (const s of allSprites) {
-          if (s.ani) { s.ani.playing = true; s.ani.play?.(); }
+          if (s.ani) {
+            s.ani.playing = true;
+            s.ani.play?.();
+          }
         }
       }
       return false;

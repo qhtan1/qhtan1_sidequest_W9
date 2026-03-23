@@ -74,8 +74,8 @@ export class Game {
     // Reset all terminal/flow flags so ESC → menu → Enter always starts fresh.
     // Without this, game.won/game.lost from a previous run would prevent
     // level.update() from running and freeze all sprite animations.
-    this.lost  = false;
-    this.won   = false;
+    this.lost = false;
+    this.won = false;
     this._submittedWin = false;
     this.elapsedMs = 0;
     this.lastWinMs = null;
@@ -263,10 +263,10 @@ export class Game {
     // if (this.won && !this.awaitingName) { ... E/V key handlers ... }
     // if (wasAwaitingName) { ... typing controls ... }
 
-    // Restart allowed from any terminal state
-    if (inputSnap?.restartPressed && (this.won || dead)) {
-      this.restart();
-    }
+    // Restart is handled in main.js with a full fresh rebuild.
+    // if (inputSnap?.restartPressed && (this.won || dead)) {
+    //   this.restart();
+    // }
   }
 
   _cycleNameChar(dir) {
