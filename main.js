@@ -350,12 +350,14 @@ function initRuntime() {
   // VIEW: parallax background renderer
   parallax = new ParallaxBackground(parallaxLayers);
 
+  setAllSpritesVisible(false);
   loop();
 
   // If we intentionally reloaded to start a fresh run, do it immediately
   if (sessionStorage.getItem(AUTO_START_KEY) === "1") {
     sessionStorage.removeItem(AUTO_START_KEY);
     createFreshRun();
+    setAllSpritesVisible(true);
     gamePaused = false;
     gameLoading = false;
     gameState = "playing";
@@ -409,6 +411,12 @@ function createFreshRun() {
 
   gameBuilt = true;
   hasStartedOnce = true;
+}
+
+function setAllSpritesVisible(isVisible) {
+  for (const s of allSprites) {
+    s.visible = isVisible;
+  }
 }
 
 function restartViaReload() {
@@ -466,14 +474,13 @@ function draw() {
     if (inputManager) {
       inputManager.update();
       if (!settingsOpen && inputManager.input.enterPressed) {
-        // First time: build normally
         if (!hasStartedOnce) {
           createFreshRun();
+          setAllSpritesVisible(true);
           gamePaused = false;
           gameLoading = false;
           gameState = "playing";
         } else {
-          // After returning from an old run, force a clean page reload
           restartViaReload();
         }
       }
@@ -641,6 +648,7 @@ function keyPressed(evt) {
       return false;
     }
 
+    setAllSpritesVisible(false);
     gamePaused = false;
     gameLoading = false;
     gameState = "menu";
