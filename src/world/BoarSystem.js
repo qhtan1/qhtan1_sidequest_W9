@@ -614,16 +614,21 @@ export function attachBoarProbes(level, e) {
   function makeProbe(color) {
     const p = new Sprite(-9999, -9999, size, size);
     p.sensor = true;
-    p.collider = "none"; // Not part of physics engine
-    p.physics = "dynamic"; // Still allow position updates
+    p.collider = "none";
+    p.physics = "dynamic";
     p.gravity = 0;
     p.mass = 0.0001;
     p.rotationLock = true;
-    p.visible = !!window.showBoarProbes;
-    p.layer = 999;
     p.friction = 0;
     p.bounciness = 0;
-    if (window.showBoarProbes && color) p.color = color;
+
+    // Never render boar helper probes in normal gameplay
+    p.visible = false;
+    p.color = "rgba(0,0,0,0)";
+    p.stroke = "rgba(0,0,0,0)";
+    p.strokeWeight = 0;
+    p.layer = -9999;
+
     return p;
   }
 
@@ -646,16 +651,22 @@ export function attachBoarProbes(level, e) {
     window.addEventListener("boarProbeDebugToggle", () => {
       for (const boar of level.boar || []) {
         if (boar.frontProbe) {
-          boar.frontProbe.visible = !!window.showBoarProbes;
-          if (window.showBoarProbes) boar.frontProbe.color = "red";
+          boar.frontProbe.visible = false;
+          boar.frontProbe.color = "rgba(0,0,0,0)";
+          boar.frontProbe.stroke = "rgba(0,0,0,0)";
+          boar.frontProbe.strokeWeight = 0;
         }
         if (boar.footProbe) {
-          boar.footProbe.visible = !!window.showBoarProbes;
-          if (window.showBoarProbes) boar.footProbe.color = "blue";
+          boar.footProbe.visible = false;
+          boar.footProbe.color = "rgba(0,0,0,0)";
+          boar.footProbe.stroke = "rgba(0,0,0,0)";
+          boar.footProbe.strokeWeight = 0;
         }
         if (boar.groundProbe) {
-          boar.groundProbe.visible = !!window.showBoarProbes;
-          if (window.showBoarProbes) boar.groundProbe.color = "green";
+          boar.groundProbe.visible = false;
+          boar.groundProbe.color = "rgba(0,0,0,0)";
+          boar.groundProbe.stroke = "rgba(0,0,0,0)";
+          boar.groundProbe.strokeWeight = 0;
         }
       }
     });

@@ -432,7 +432,7 @@ export class BoarController {
     e.footProbe = new Sprite(-9999, -9999, this.PROBE_SIZE, this.PROBE_SIZE);
     e.footProbe.collider = "none";
     e.footProbe.sensor = true;
-    e.footProbe.visible = !!(window.debugState && window.debugState.boarProbes);
+    e.footProbe.visible = false;
     e.footProbe.layer = 999;
     // Force correct settings in case Sprite constructor or external code changes them
     e.footProbe.physics = "dynamic";
@@ -444,9 +444,7 @@ export class BoarController {
     e.frontProbe = new Sprite(-9999, -9999, this.PROBE_SIZE, this.PROBE_SIZE);
     e.frontProbe.collider = "none";
     e.frontProbe.sensor = true;
-    e.frontProbe.visible = !!(
-      window.debugState && window.debugState.boarProbes
-    );
+    e.frontProbe.visible = false;
     e.frontProbe.layer = 999;
     e.frontProbe.physics = "dynamic";
     e.frontProbe.mass = 0.0001;
@@ -457,9 +455,7 @@ export class BoarController {
     e.groundProbe = new Sprite(-9999, -9999, this.PROBE_SIZE, this.PROBE_SIZE);
     e.groundProbe.collider = "none";
     e.groundProbe.sensor = true;
-    e.groundProbe.visible = !!(
-      window.debugState && window.debugState.boarProbes
-    );
+    e.groundProbe.visible = false;
     e.groundProbe.layer = 999;
 
     // Ensure probes are in allSprites and drawn above boar
@@ -468,9 +464,9 @@ export class BoarController {
       if (!allSprites.includes(e.frontProbe)) allSprites.push(e.frontProbe);
       if (!allSprites.includes(e.groundProbe)) allSprites.push(e.groundProbe);
     }
-    e.footProbe.layer = 9999;
-    e.frontProbe.layer = 9999;
-    e.groundProbe.layer = 9999;
+    e.footProbe.layer = -9999;
+    e.frontProbe.layer = -9999;
+    e.groundProbe.layer = -9999;
   }
 
   _updateProbes(e) {
