@@ -424,6 +424,35 @@ function restartViaReload() {
   window.location.reload();
 }
 
+function hideHelperSprites() {
+  for (const s of allSprites) {
+    // Hide thin sensor/probe bars or untextured helper sprites
+    const hasAnimation = !!s.ani;
+    const hasImage =
+      !!s.img || !!s.image || !!s.animation || !!s.spriteSheet || !!s._ani;
+
+    const thinHorizontalBar =
+      Number(s.w ?? 0) >= 10 && Number(s.h ?? 0) > 0 && Number(s.h ?? 0) <= 4;
+
+    const tinyHelper =
+      Number(s.w ?? 0) <= 4 &&
+      Number(s.h ?? 0) <= 4 &&
+      !hasAnimation &&
+      !hasImage;
+
+    const looksLikeProbeByName =
+      typeof s.name === "string" && /probe|sensor|helper|ground/i.test(s.name);
+
+    if (
+      (!hasAnimation && !hasImage && thinHorizontalBar) ||
+      tinyHelper ||
+      looksLikeProbeByName
+    ) {
+      s.visible = false;
+    }
+  }
+}
+
 // ------------------------------------------------------------
 // p5 lifecycle (module-safe)
 // ------------------------------------------------------------
@@ -502,7 +531,9 @@ function draw() {
   const isLoading = gameLoading; // load-screen overlay
   if (!isPaused && !isLoading) {
     game.update();
+    hideHelperSprites();
   } else {
+    hideHelperSprites();
     for (const s of allSprites) {
       // Always zero velocities so sprites don't drift while frozen
       if (s.vel) {
