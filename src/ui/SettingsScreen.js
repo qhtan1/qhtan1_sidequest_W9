@@ -84,8 +84,9 @@ export class SettingsScreen {
     rect(0, 0, viewW, viewH);
     pop();
 
-    // Panel
-    const panelW = 210;
+    // Panel — wide enough to hold the longest option line (21 chars × 10px = 210px)
+    // with comfortable left/right margin inside a 240px viewport.
+    const panelW = 224;
     const panelH = 90;
     const panelX = Math.round((viewW - panelW) / 2);
     const panelY = Math.round((viewH - panelH) / 2);
@@ -131,13 +132,13 @@ export class SettingsScreen {
       const y     = panelY + 40 + i * 18;
       const sel   = i === this._cursor;
       const arrow = sel ? "> " : "  ";
-      const line  = arrow + opt.label + ": [" + opt.value + "]";
+      const line  = arrow + opt.label + ": " + opt.value;
       const tx    = Math.round((viewW - line.length * this.GLYPH_W) / 2);
       this._drawOutlined(line, tx, y, sel ? "#ffffff" : "#aaaaaa");
     }
 
-    // Help text
-    const help  = "ENTER: toggle  ESC: back";
+    // Help text — "ENTER:toggle  ESC:back" = 22 chars × 10px = 220px, fits in 224px panel
+    const help  = "ENTER:toggle  ESC:back";
     const txH   = Math.round((viewW - help.length * this.GLYPH_W) / 2);
     this._drawOutlined(help, txH, panelY + panelH - 14, "#556677");
 

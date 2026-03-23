@@ -174,6 +174,11 @@ export class Level {
     this._lastScore = this._lastHealth = this._lastMaxHealth = null;
     maybeRedrawHUD(this);
 
+    // IMPORTANT: new Group() calls inside buildTilesAndGroups / buildBoarGroup can
+    // silently reset world.autoStep to true in some p5play builds.
+    // Re-assert manual stepping here so world.step() in update() stays the sole driver.
+    world.autoStep = false;
+
     return this;
   }
 
@@ -280,6 +285,11 @@ export class Level {
 
     this._lastScore = this._lastHealth = this._lastMaxHealth = null;
     maybeRedrawHUD(this);
+
+    // IMPORTANT: rebuildBoarsFromSpawns → buildBoarGroup → new Group() can reset
+    // world.autoStep to true. Re-assert manual stepping so world.step() in update()
+    // remains the sole physics driver (prevents double-stepping that breaks jumping).
+    world.autoStep = false;
 
     this.events?.emit("level:restarted");
   }

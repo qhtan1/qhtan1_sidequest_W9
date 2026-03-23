@@ -234,12 +234,14 @@ export class PlayerEntity {
   }
 
   moveLeft() {
-    this.sprite.vel.x = -this.MOVE_SPEED;
+    const speed = this.MOVE_SPEED * (window.settings?.reducedMotion ? 0.6 : 1);
+    this.sprite.vel.x = -speed;
     this.sprite.mirror.x = true;
   }
 
   moveRight() {
-    this.sprite.vel.x = this.MOVE_SPEED;
+    const speed = this.MOVE_SPEED * (window.settings?.reducedMotion ? 0.6 : 1);
+    this.sprite.vel.x = speed;
     this.sprite.mirror.x = false;
   }
 

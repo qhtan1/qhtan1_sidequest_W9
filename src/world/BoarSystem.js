@@ -570,8 +570,9 @@ export function updateBoars(level) {
       continue;
     }
 
-    // patrol
-    e.vel.x = e.dir * boarSpeed;
+    // patrol — reduced motion halves boar speed for accessibility
+    const effectiveSpeed = boarSpeed * (window.settings?.reducedMotion ? 0.5 : 1);
+    e.vel.x = e.dir * effectiveSpeed;
     e.mirror.x = e.dir === -1;
 
     // Extra safety: don't let "run" override terminal states

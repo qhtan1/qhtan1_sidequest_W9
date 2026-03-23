@@ -324,6 +324,13 @@ export class Game {
     // opts.preserveKills = true when loading a save (keep killed-boar state)
     this.level.restart(opts);
 
+    // IMPORTANT: rebuildBoarsFromSpawns() calls buildBoarGroup() which creates a
+    // new Group(); some p5play builds silently reset world.autoStep to true at that
+    // point, which makes physics self-step and causes jump/animation glitches on the
+    // first frame after restart.  Re-assert autoStep=false here so main.js's
+    // world.step() in update() stays the sole physics driver.
+    if (typeof world !== "undefined") world.autoStep = false;
+
     // Re-enable animations that were frozen during terminal state
     for (const s of allSprites) {
       if (s.ani) s.ani.playing = true;

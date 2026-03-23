@@ -32,107 +32,86 @@ export class MenuScreen {
     push();
     imageMode(CORNER);
 
-    // ---- Layer 1: forest background (furthest parallax layer) ----
+    // ---- Layer 1: forest background ----
     const bgImg = this.assets?.backgrounds?.bgFar;
     if (bgImg) {
-      // stretch to fill canvas
       image(bgImg, 0, 0, viewW, viewH);
     } else {
-      // fallback solid colour
       noStroke();
       fill(20, 16, 30);
       rect(0, 0, viewW, viewH);
     }
 
-    // ---- Layer 2: soft semi-transparent panel ----
-    // Panel sits in the centre, leaving a gap on each side
+    // ---- Layer 2: panel ----
+    // Panel: 16px margins left/right, 20px top, extends to viewH-16 bottom.
     const panelX = 16;
     const panelY = 20;
-    const panelW = viewW - 32;
-    const panelH = viewH - 36;
+    const panelW = viewW - 32;   // 208 px at 240-wide view
+    const panelH = viewH - 36;   // 156 px: bottom edge at y=176
 
-    // Outer glow: four progressively smaller, more opaque rects
     noStroke();
     for (let i = 4; i >= 0; i--) {
       fill(8, 5, 18, 30 + i * 20);
       rect(panelX - i * 3, panelY - i * 3, panelW + i * 6, panelH + i * 6, 6 + i * 2);
     }
-    // Solid panel core
     fill(8, 5, 18, 195);
     rect(panelX, panelY, panelW, panelH, 6);
-
-    // Thin border
     stroke(80, 140, 200, 120);
     strokeWeight(1);
     noFill();
     rect(panelX + 1, panelY + 1, panelW - 2, panelH - 2, 5);
     noStroke();
-
     pop();
 
     // ---- Layer 3: text ----
+    // All y-values chosen so content stays between y=26 and y=172 (inside panel).
 
-    // Title
+    // Title  (y = 32)
     const title = "FOREST RESCUE";
-    const txTitle = Math.round((viewW - title.length * this.GLYPH_W) / 2);
-    this._drawOutlined(title, txTitle, 30, "#00e5ff");
+    this._drawOutlined(title,
+      Math.round((viewW - title.length * this.GLYPH_W) / 2), 32, "#00e5ff");
 
-    // Subtitle
+    // Subtitle  (y = 48)
     const sub = "A rescue adventure";
-    const txSub = Math.round((viewW - sub.length * this.GLYPH_W) / 2);
-    this._drawOutlined(sub, txSub, 48, "#aaaaaa");
+    this._drawOutlined(sub,
+      Math.round((viewW - sub.length * this.GLYPH_W) / 2), 48, "#aaaaaa");
 
-    // Divider hint
-    this._drawOutlined("- - - - - - - - - - -", Math.round((viewW - 21 * this.GLYPH_W) / 2), 62, "#334455");
+    // Divider  (y = 62)
+    this._drawOutlined("- - - - - - - - - - -",
+      Math.round((viewW - 21 * this.GLYPH_W) / 2), 62, "#334455");
 
-    // Controls (keep each line ≤ 20 chars so it fits inside the panel)
+    // Controls  (y = 76, 90)
     const ctrl1 = "Arrows:move  Z:atk";
     const ctrl2 = "Collect all leaves!";
-    const txC1 = Math.round((viewW - ctrl1.length * this.GLYPH_W) / 2);
-    const txC2 = Math.round((viewW - ctrl2.length * this.GLYPH_W) / 2);
-    this._drawOutlined(ctrl1, txC1, 74, "#88aacc");
-    this._drawOutlined(ctrl2, txC2, 86, "#88aacc");
+    this._drawOutlined(ctrl1, Math.round((viewW - ctrl1.length * this.GLYPH_W) / 2), 76, "#88aacc");
+    this._drawOutlined(ctrl2, Math.round((viewW - ctrl2.length * this.GLYPH_W) / 2), 90, "#88aacc");
 
-    // Best times
-    if (topScores.length > 0) {
-      const hsLabel = "BEST TIMES";
-      const txHs = Math.round((viewW - hsLabel.length * this.GLYPH_W) / 2);
-      this._drawOutlined(hsLabel, txHs, 104, "#ffdc00");
-
-      for (let i = 0; i < Math.min(3, topScores.length); i++) {
-        const e = topScores[i];
-        const row = `${i + 1}. ${(e.name ?? "---").padEnd(3)}  ${_formatMs(e.ms ?? 0)}`;
-        const txRow = Math.round((viewW - row.length * this.GLYPH_W) / 2);
-        this._drawOutlined(row, txRow, 116 + i * 14, i === 0 ? "#ffdc00" : "#ffffff");
-      }
-    }
-
-    // ---- Last save slot ----
+    // ---- Last save slot  (y = 116, 130) ----
     if (savedGame) {
       const saveLabel = "LAST SAVE:";
-      const txSave = Math.round((viewW - saveLabel.length * this.GLYPH_W) / 2);
-      this._drawOutlined(saveLabel, txSave, viewH - 40, "#ff9900");
+      this._drawOutlined(saveLabel,
+        Math.round((viewW - saveLabel.length * this.GLYPH_W) / 2), 116, "#ff9900");
 
       const rescued = savedGame.leavesRescued ?? 0;
       const total   = savedGame.totalLeaves   ?? 0;
       const timeStr = _formatMs(savedGame.elapsedMs ?? 0);
       const saveInfo = `${rescued}/${total} leaves  ${timeStr}`;
-      const txInfo = Math.round((viewW - saveInfo.length * this.GLYPH_W) / 2);
-      this._drawOutlined(saveInfo, txInfo, viewH - 28, "#ffcc66");
+      this._drawOutlined(saveInfo,
+        Math.round((viewW - saveInfo.length * this.GLYPH_W) / 2), 130, "#ffcc66");
     }
 
-    // "Press ENTER" blink
+    // "Press ENTER" blink  (y = 152 = viewH-40)
     if (this._blink < 40) {
       const prompt = savedGame ? "ENTER: new game" : "Press ENTER to start";
-      const txPrompt = Math.round((viewW - prompt.length * this.GLYPH_W) / 2);
-      this._drawOutlined(prompt, txPrompt, viewH - 16, "#00ff7a");
+      this._drawOutlined(prompt,
+        Math.round((viewW - prompt.length * this.GLYPH_W) / 2), viewH - 40, "#00ff7a");
     }
 
-    // Settings hint (bottom-right area)
+    // Settings hint  (y = 164 = viewH-28)  — inside panel bottom (176)
     if (showSettingsHint) {
       const hint = "O: settings";
-      const txHint = Math.round((viewW - hint.length * this.GLYPH_W) / 2);
-      this._drawOutlined(hint, txHint, viewH - 6, "#446655");
+      this._drawOutlined(hint,
+        Math.round((viewW - hint.length * this.GLYPH_W) / 2), viewH - 28, "#446655");
     }
 
     camera.on();
