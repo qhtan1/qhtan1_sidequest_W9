@@ -546,7 +546,14 @@ function keyPressed(evt) {
       if (toRestore > 0 && game.level.leafSpawns) {
         for (let i = 0; i < toRestore; i++) {
           const item = game.level.leafSpawns[i];
-          if (item?.s) { item.s.active = false; item.s.visible = false; }
+          if (item?.s) {
+            item.s.active  = false;
+            item.s.visible = false;
+            // Belt-and-suspenders: move off-screen in case visible=false
+            // doesn't suppress drawing for group sprites in this p5play build.
+            // Level.restart() already does `s.y = item.y` so restart restores it.
+            item.s.y = -9999;
+          }
         }
         game.level.score = toRestore;
         game.level._lastScore = null; // force HUD redraw on next update

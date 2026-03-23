@@ -185,10 +185,19 @@ export class PlayerEntity {
   // queries
   // -----------------------
   isGrounded(solids) {
+    if (!this.sprite) return false;
+
+    // Primary: p5play v3 contact-based detection.
+    // sprite.touching.bottom is truthy when the player's physics body has
+    // a downward contact — reliable even after allSprites.remove() + rebuild
+    // because it uses the player sprite's own contacts, not a separate sensor.
+    if (this.sprite.touching?.bottom) return true;
+
+    // Fallback: original sensor-based overlap check
+    // (sensor has removeColliders() called, so this may not work in all
+    //  p5play states, but kept as a safety net)
     const s = this.sensor;
     if (!s) return false;
-
-    // Allow either { ground, platformsL, ... } OR an array [ground, platformsL, ...]
     const list = Array.isArray(solids) ? solids : Object.values(solids || {});
     for (const g of list) {
       if (g && s.overlapping(g)) return true;
