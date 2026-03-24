@@ -127,10 +127,12 @@ function replaceBoarSprite(level, oldBoar, desiredW, desiredH) {
   // We only copy what we rely on.
   s._lvlInit = false;
 
-  // Remove the old sprite from the world + group safely
-  oldBoar.footProbe?.remove?.();
-  oldBoar.frontProbe?.remove?.();
-  oldBoar.groundProbe?.remove?.();
+  // Remove the old sprite from the world + group safely.
+  // Null probes BEFORE calling remove() so the overridden remove()
+  // doesn't double-remove already-removed sprites.
+  oldBoar.footProbe?.remove?.();   oldBoar.footProbe = null;
+  oldBoar.frontProbe?.remove?.();  oldBoar.frontProbe = null;
+  oldBoar.groundProbe?.remove?.(); oldBoar.groundProbe = null;
   oldBoar.remove?.();
 
   // Add new sprite to the boar group
@@ -204,9 +206,9 @@ export function clearBoars(level) {
   // leaving phantom sprites in allSprites that pile up on the next rebuild.
   const snapshot = [...level.boar];
   for (const e of snapshot) {
-    e.footProbe?.remove?.();
-    e.frontProbe?.remove?.();
-    e.groundProbe?.remove?.();
+    e.footProbe?.remove?.();   e.footProbe = null;
+    e.frontProbe?.remove?.();  e.frontProbe = null;
+    e.groundProbe?.remove?.(); e.groundProbe = null;
     e.remove?.();
   }
 }
@@ -326,9 +328,9 @@ export function updateBoars(level) {
         level.killedBoarIndices.push(spawnIdx);
       }
 
-      e.footProbe?.remove?.();
-      e.frontProbe?.remove?.();
-      e.groundProbe?.remove?.();
+      e.footProbe?.remove?.();   e.footProbe = null;
+      e.frontProbe?.remove?.();  e.frontProbe = null;
+      e.groundProbe?.remove?.(); e.groundProbe = null;
       e.remove?.();
       continue;
     }
@@ -489,9 +491,9 @@ export function updateBoars(level) {
           e.visible = Math.floor(e.vanishTimer / 3) % 2 === 0;
           e.vanishTimer--;
         } else {
-          e.footProbe?.remove?.();
-          e.frontProbe?.remove?.();
-          e.groundProbe?.remove?.();
+          e.footProbe?.remove?.();   e.footProbe = null;
+          e.frontProbe?.remove?.();  e.frontProbe = null;
+          e.groundProbe?.remove?.(); e.groundProbe = null;
           e.remove?.();
         }
       }

@@ -348,18 +348,23 @@ export class Level {
 
       if (boarSprite.dead || boarSprite.dying) return;
 
-      // Fire is instant death: set dead state immediately, bypass grounded check
+      // Fire is instant death: mark dead immediately, bypass grounded check.
+      // IMPORTANT: do NOT call collider="none" or removeColliders() here.
+      // This callback fires inside a Box2D contact resolution pass.
+      // Destroying a body/fixture during contact callbacks corrupts the
+      // contact graph and crashes the physics engine on the next step,
+      // causing the game to freeze on the purple background (noLoop).
+      // Instead, just zero velocity and mark dead; updateBoars() will
+      // safely destroy the body in the next frame (outside any callback).
       boarSprite.hp = 0;
       boarSprite.dying = true;
       boarSprite.dead = true; // Immediate death - bypass grounded check for walking into fire
-      boarSprite.deathStarted = false; // Reset so death animation/removal begins
+      boarSprite.deathStarted = false; // Reset so death animation/removal begins in updateBoars
       boarSprite.knockTimer = 0;
       boarSprite.recoveryTimer = -1;
       boarSprite.vel.x = 0;
       boarSprite.vel.y = 0;
-      boarSprite.collider = "none";
-      boarSprite.removeColliders?.();
-      // Store current position for death animation
+      // Store current position for death animation (updateBoars will also refresh this)
       boarSprite.holdX = boarSprite.x;
       boarSprite.holdY = boarSprite.y;
       boarSprite.deathFrameTimer = 0;

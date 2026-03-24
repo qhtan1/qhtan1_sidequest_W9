@@ -555,7 +555,15 @@ function draw() {
   const isPaused = gamePaused || !!window.gamePaused; // true pause (P key / debug)
   const isLoading = gameLoading; // load-screen overlay
   if (!isPaused && !isLoading) {
-    game.update();
+    // Wrap update in try-catch so a physics exception (e.g. Box2D contact-
+    // graph corruption from removeColliders() inside a callback) does NOT
+    // propagate to p5.js, which would call noLoop() and freeze the game on
+    // the purple background.
+    try {
+      game.update();
+    } catch (err) {
+      console.error("[game.update] physics error — skipping frame:", err);
+    }
     hideProbeSprites();
     hideHelperSprites();
   } else {
