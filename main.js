@@ -564,6 +564,12 @@ function draw() {
     } catch (err) {
       console.error("[game.update] physics error — skipping frame:", err);
     }
+    // After any caught exception inside game.update(), world.autoStep may have
+    // been reset to true by a new Sprite()/Group() call inside the failed frame.
+    // Force it back to false so p5play's pre-draw hook doesn't double-step
+    // physics on the next frame (which would crash outside our try-catch and
+    // still trigger noLoop()).
+    world.autoStep = false;
     hideProbeSprites();
     hideHelperSprites();
   } else {
@@ -594,23 +600,30 @@ function draw() {
   const dead = game?.lost === true || game?.level?.player?.dead === true;
   const elapsedMs = Number(game?.elapsedMs ?? game?.level?.elapsedMs ?? 0);
 
-  // WORLD draw + HUD composite (hide HUD on win/lose screens)
-  game.draw({
-    drawHudFn:
-      won || dead
-        ? null
-        : () => {
-            camera.off();
-            try {
-              drawingContext.imageSmoothingEnabled = false;
-              imageMode(CORNER);
-              image(hudGfx, 0, 0);
-            } finally {
-              camera.on();
-              noTint();
-            }
-          },
-  });
+  // WORLD draw + HUD composite (hide HUD on win/lose screens).
+  // Wrapped in try-catch: a corrupted sprite animation (_frame out of bounds,
+  // etc.) can throw inside allSprites.draw() → _display(), which would
+  // otherwise bubble up to p5.js and trigger noLoop() → purple screen.
+  try {
+    game.draw({
+      drawHudFn:
+        won || dead
+          ? null
+          : () => {
+              camera.off();
+              try {
+                drawingContext.imageSmoothingEnabled = false;
+                imageMode(CORNER);
+                image(hudGfx, 0, 0);
+              } finally {
+                camera.on();
+                noTint();
+              }
+            },
+    });
+  } catch (err) {
+    console.error("[game.draw] render error — skipping frame:", err);
+  }
 
   // Draw debug menu overlay if enabled
   debugMenu?.draw();

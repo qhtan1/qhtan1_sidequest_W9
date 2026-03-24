@@ -259,6 +259,14 @@ export function rebuildBoarsFromSpawns(level) {
 
     attachBoarProbes(level, e);
 
+    // IMPORTANT: mark as initialised BEFORE adding to the group.
+    // Without this flag, updateBoars() treats the sprite as a fresh
+    // Tiles()-spawned boar on every call and re-runs the one-time init
+    // block, creating duplicate probe sprites and extra new Sprite() calls
+    // that silently reset world.autoStep = true (causing the next p5play
+    // pre-draw to double-step physics → crash → noLoop → purple screen).
+    e._lvlInit = true;
+
     e.dir = s.dir === 1 || s.dir === -1 ? s.dir : random([-1, 1]);
     fixSpawnEdgeCase(level, e);
 
