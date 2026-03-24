@@ -1,26 +1,39 @@
 // src/SaveManager.js
-// Simple save/load system using localStorage.
+// Single-slot save/load system using localStorage.
 //
-// Saves a single "game save" slot containing the player's last
-// completed run (leaves rescued, completion time, timestamp).
-// Completely separate from HighScoreManager (which tracks the
-// all-time leaderboard); SaveManager tracks the last session.
+// Stores a snapshot of the current run, including:
+// - leaf progress
+// - elapsed time
+// - collected leaf indices
+// - killed boar indices
+// - player health
 
 export class SaveManager {
-  constructor(key = "gbda302_savegame_v1") {
+  constructor(key = "gbda302_savegame_v2") {
     this.key = key;
   }
 
-  // Persist a run snapshot to localStorage.
-  // data: { leavesRescued, totalLeaves, elapsedMs }
   save(data) {
     try {
       const snapshot = {
         leavesRescued: data.leavesRescued ?? 0,
-        totalLeaves:   data.totalLeaves   ?? 0,
-        elapsedMs:     data.elapsedMs     ?? 0,
-        savedAt:       Date.now(),
+        totalLeaves: data.totalLeaves ?? 0,
+        elapsedMs: data.elapsedMs ?? 0,
+
+        // Important runtime state
+        collectedLeafIndices: Array.isArray(data.collectedLeafIndices)
+          ? [...data.collectedLeafIndices]
+          : [],
+
+        killedBoarIndices: Array.isArray(data.killedBoarIndices)
+          ? [...data.killedBoarIndices]
+          : [],
+
+        health: data.health ?? 3,
+
+        savedAt: Date.now(),
       };
+
       localStorage.setItem(this.key, JSON.stringify(snapshot));
       console.log("[SaveManager] Game saved:", snapshot);
       return true;
@@ -30,23 +43,36 @@ export class SaveManager {
     }
   }
 
-  // Load the saved snapshot, or null if nothing is saved.
   load() {
     try {
       const raw = localStorage.getItem(this.key);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw);
+
+      return {
+        leavesRescued: parsed.leavesRescued ?? 0,
+        totalLeaves: parsed.totalLeaves ?? 0,
+        elapsedMs: parsed.elapsedMs ?? 0,
+        collectedLeafIndices: Array.isArray(parsed.collectedLeafIndices)
+          ? parsed.collectedLeafIndices
+          : [],
+        killedBoarIndices: Array.isArray(parsed.killedBoarIndices)
+          ? parsed.killedBoarIndices
+          : [],
+        health: parsed.health ?? 3,
+        savedAt: parsed.savedAt ?? null,
+      };
     } catch (e) {
       console.warn("[SaveManager] Load failed:", e);
       return null;
     }
   }
 
-  // Returns true if a save slot exists.
   hasSave() {
     return !!localStorage.getItem(this.key);
   }
 
-  // Delete the save slot.
   clear() {
     localStorage.removeItem(this.key);
   }
