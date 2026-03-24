@@ -740,9 +740,12 @@ function keyPressed(evt) {
       const savedKills = Array.isArray(sv.killedBoarIndices)
         ? sv.killedBoarIndices
         : [];
-      game.level.killedBoarIndices = [...savedKills];
 
       game.restart({ preserveKills: true });
+      game.level.killedBoarIndices = [...savedKills];
+
+      // Rebuild once more so killed boars stay gone after loading
+      game.level.restart({ preserveKills: true });
       world.autoStep = false;
 
       game.level.elapsedMs = sv.elapsedMs ?? 0;

@@ -1,12 +1,5 @@
 // src/SaveManager.js
 // Single-slot save/load system using localStorage.
-//
-// Stores a snapshot of the current run, including:
-// - leaf progress
-// - elapsed time
-// - collected leaf indices
-// - killed boar indices
-// - player health
 
 export class SaveManager {
   constructor(key = "gbda302_savegame_v2") {
@@ -20,7 +13,6 @@ export class SaveManager {
         totalLeaves: data.totalLeaves ?? 0,
         elapsedMs: data.elapsedMs ?? 0,
 
-        // Important runtime state
         collectedLeafIndices: Array.isArray(data.collectedLeafIndices)
           ? [...data.collectedLeafIndices]
           : [],
@@ -30,7 +22,6 @@ export class SaveManager {
           : [],
 
         health: data.health ?? 3,
-
         savedAt: Date.now(),
       };
 
@@ -54,12 +45,15 @@ export class SaveManager {
         leavesRescued: parsed.leavesRescued ?? 0,
         totalLeaves: parsed.totalLeaves ?? 0,
         elapsedMs: parsed.elapsedMs ?? 0,
+
         collectedLeafIndices: Array.isArray(parsed.collectedLeafIndices)
           ? parsed.collectedLeafIndices
           : [],
+
         killedBoarIndices: Array.isArray(parsed.killedBoarIndices)
           ? parsed.killedBoarIndices
           : [],
+
         health: parsed.health ?? 3,
         savedAt: parsed.savedAt ?? null,
       };
